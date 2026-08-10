@@ -1,0 +1,27 @@
+{
+  "name": "pier-ocpp16-lab",
+  "version": "1.0.0",
+  "description": "Pier OCPP 1.6 Charge Point lab console",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -n server,client -c cyan,amber \"npm run server\" \"npm run client\"",
+    "server": "node server/index.js",
+    "client": "npm run dev --prefix client",
+    "build": "npm run build --prefix client",
+    "start": "node server/index.js",
+    "smoke": "node scripts/smoke-local.mjs",
+    "probe:cms": "node scripts/probe-cms.mjs",
+    "install:all": "npm install && npm install --prefix client"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1",
+    "uuid": "^11.1.0",
+    "ws": "^8.18.1"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

@@ -1,0 +1,276 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { io } from 'socket.io-client';
+import ConnectionDock from './components/ConnectionDock.jsx';
+import ChargerStage from './components/ChargerStage.jsx';
+import ActionBar from './components/ActionBar.jsx';
+import MessageTrace from './components/MessageTrace.jsx';
+import './styles/console.css';
+
+const api = async (path, options = {}) => {
+  const res = await fetch(path, {
+    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
+    ...options,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+};
+
+export default function App() {
+  const [chargers, setChargers] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [logs, setLogs] = useState([]);
+  const [activeConnector, setActiveConnector] = useState(1);
+  const [selectedConnectors, setSelectedConnectors] = useState([1]);
+  const [idTag, setIdTag] = useState('CARD-7F2A91');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [benchOpen, setBenchOpen] = useState(false);
+
+  const selected = useMemo(
+    () => chargers.find((c) => c.cpId === selectedId) || null,
+    [chargers, selectedId]
+  );
+
+  useEffect(() => {
+    const socket = io({ transports: ['websocket', 'polling'] });
+
+    socket.on('cp:snapshot', (payload) => {
+      setChargers(payload.chargers || []);
+      if (!selectedId && payload.chargers?.[0]) {
+        setSelectedId(payload.chargers[0].cpId);
+      }
+    });
+
+    socket.on('cp:state', (state) => {
+      setChargers((prev) => {
+        const idx = prev.findIndex((c) => c.cpId === state.cpId);
+        if (idx === -1) return [...prev, state];
+        const next = [...prev];
+        next[idx] = state;
+        return next;
+      });
+    });
+
+    socket.on('cp:removed', ({ cpId }) => {
+      setChargers((prev) => prev.filter((c) => c.cpId !== cpId));
+      setSelectedId((cur) => (cur === cpId ? null : cur));
+    });
+
+    socket.on('cp:message', (msg) => {
+      if (msg.kind === 'ocpp') {
+        setMessages((prev) => [...prev.slice(-199), msg]);
+      }
+    });
+
+    socket.on('cp:log', (entry) => {
+      setLogs((prev) => [...prev.slice(-99), entry]);
+    });
+
+    api('/api/chargers')
+      .then((data) => {
+        setChargers(data.chargers || []);
+        if (data.chargers?.[0]) setSelectedId(data.chargers[0].cpId);
+      })
+      .catch(() => {});
+
+    return () => socket.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!selected) return;
+    const guns = selected.connectors.filter((c) => c.number > 0).map((c) => c.number);
+    if (!guns.length) return;
+    if (!guns.includes(activeConnector)) {
+      setActiveConnector(guns[0]);
+      setSelectedConnectors([guns[0]]);
+      return;
+    }
+    setSelectedConnectors((prev) => {
+      const next = prev.filter((n) => guns.includes(n));
+      return next.length ? next : [activeConnector];
+    });
+  }, [selected, activeConnector]);
+
+  const selectConnector = (n) => {
+    setActiveConnector(n);
+    setSelectedConnectors([n]);
+  };
+
+  const toggleSelectConnector = (n) => {
+    setSelectedConnectors((prev) => {
+      const has = prev.includes(n);
+      let next;
+      if (has) {
+        next = prev.filter((x) => x !== n);
+        if (!next.length) next = [n];
+      } else {
+        next = [...prev, n];
+      }
+      setActiveConnector(n);
+      return next;
+    });
+  };
+
+  const run = useCallback(async (fn) => {
+    setBusy(true);
+    setError('');
+    try {
+      await fn();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
+  const addCharger = (form) =>
+    run(async () => {
+      const data = await api('/api/chargers', {
+        method: 'POST',
+        body: JSON.stringify(form),
+      });
+      setSelectedId(data.charger.cpId);
+      setActiveConnector(1);
+      setSelectedConnectors([1]);
+    });
+
+  const removeCharger = (cpId) =>
+    run(async () => {
+      await api(`/api/chargers/${encodeURIComponent(cpId)}`, { method: 'DELETE' });
+    });
+
+  const act = (path, body) =>
+    run(async () => {
+      if (!selectedId) throw new Error('No charger selected');
+      await api(`/api/chargers/${encodeURIComponent(selectedId)}${path}`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+    });
+
+  return (
+    <div className="console-shell yard-first">
+      <header className="console-top">
+        <div className="brand-block">
+          <div className="brand-mark" aria-hidden />
+          <div>
+            <h1 className="brand-name">Pier</h1>
+            <p className="brand-sub">Charge Point Lab · OCPP 1.6J</p>
+          </div>
+        </div>
+        <div className="top-meta">
+          <span className="meta-pill">{chargers.length} station{chargers.length === 1 ? '' : 's'}</span>
+          {selected && (
+            <span className={`meta-pill link-${selected.connectionState}`}>
+              {selected.connectionState}
+            </span>
+          )}
+          <button type="button" className="ghost-btn" onClick={() => setBenchOpen((v) => !v)}>
+            {benchOpen ? 'Hide bench' : 'Bench controls'}
+          </button>
+        </div>
+      </header>
+
+      <div className={`console-body ${benchOpen ? 'with-bench' : 'yard-wide'}`}>
+        <aside className="rail">
+          <ConnectionDock
+            chargers={chargers}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onAdd={addCharger}
+            onRemove={removeCharger}
+            busy={busy}
+          />
+        </aside>
+
+        <main className="stage-wrap roomy">
+          {selected ? (
+            <ChargerStage
+              charger={selected}
+              activeConnector={activeConnector}
+              selectedConnectors={selectedConnectors}
+              onSelectConnector={selectConnector}
+              onToggleSelectConnector={toggleSelectConnector}
+              busy={busy}
+              idTag={idTag}
+              onIdTagChange={setIdTag}
+              onPlug={(connectorId, plugged) => act('/plug', { connectorId, plugged })}
+              onStart={(connectorId, tag) =>
+                act('/start', { connectorId, idTag: tag })
+              }
+              onStop={(connectorId, reason) => act('/stop', { connectorId, reason })}
+              onEmergency={(connectorId) =>
+                act('/emergency-stop', { connectorId })
+              }
+              onClearFault={(connectorId) =>
+                act('/clear-fault', { connectorId })
+              }
+              onPower={(connectorId, powerKw) =>
+                act('/power', { connectorId, powerKw })
+              }
+            />
+          ) : (
+            <div className="empty-stage">
+              <h2>No station on the bench</h2>
+              <p>Commission a charge point from the left rail to open the Pier yard.</p>
+            </div>
+          )}
+        </main>
+
+        {benchOpen && (
+          <aside className="controls-rail">
+            <ActionBar
+              charger={selected}
+              connectorId={activeConnector}
+              selectedConnectors={selectedConnectors}
+              busy={busy}
+              idTag={idTag}
+              onIdTagChange={setIdTag}
+              onPlug={(plugged) => act('/plug', { connectorId: activeConnector, plugged })}
+              onStart={(tag) => act('/start', { connectorId: activeConnector, idTag: tag })}
+              onStop={(reason) => act('/stop', { connectorId: activeConnector, reason })}
+              onEmergency={() => act('/emergency-stop', { connectorId: activeConnector })}
+              onFault={(errorCode) => act('/fault', { connectorId: activeConnector, errorCode })}
+              onClearFault={() => act('/clear-fault', { connectorId: activeConnector })}
+              onSuspend={(who) => act('/suspend', { connectorId: activeConnector, who })}
+              onType={(type) => act('/connector-type', { connectorId: activeConnector, type })}
+              onName={(name) =>
+                act('/connector-name', { connectorId: activeConnector, name })
+              }
+              onPower={(powerKw) =>
+                act('/power', { connectorId: activeConnector, powerKw })
+              }
+              onSoc={(soc, batteryKwh) =>
+                act('/soc', { connectorId: activeConnector, soc, batteryKwh })
+              }
+              onReconnect={(requireSubprotocol) => act('/reconnect', { requireSubprotocol })}
+              onReset={(type) => act('/reset', { type })}
+              onAddTag={(tag) => act('/local-tag', { idTag: tag })}
+              onAuthMode={(authMode) => act('/auth-mode', { authMode })}
+            />
+          </aside>
+        )}
+      </div>
+
+      {error && (
+        <div className="toast-error" role="alert">
+          {error}
+          <button type="button" onClick={() => setError('')}>
+            dismiss
+          </button>
+        </div>
+      )}
+
+      <MessageTrace
+        messages={messages.filter((m) => !selectedId || m.cpId === selectedId)}
+        logs={logs.filter((l) => !selectedId || l.cpId === selectedId)}
+        onClear={() => {
+          setMessages([]);
+          setLogs([]);
+        }}
+      />
+    </div>
+  );
+}

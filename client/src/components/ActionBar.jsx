@@ -1,0 +1,303 @@
+import { useEffect, useState } from 'react';
+import RfidPad from './RfidPad.jsx';
+
+const ERROR_CODES = [
+  'ConnectorLockFailure',
+  'EVCommunicationError',
+  'GroundFailure',
+  'HighTemperature',
+  'InternalError',
+  'OverCurrentFailure',
+  'OverVoltage',
+  'PowerMeterFailure',
+  'PowerSwitchFailure',
+  'ReaderFailure',
+  'UnderVoltage',
+  'WeakSignal',
+  'OtherError',
+];
+
+const STOP_REASONS = [
+  'Local',
+  'EVDisconnected',
+  'EmergencyStop',
+  'PowerLoss',
+  'DeAuthorized',
+  'Other',
+];
+
+const CONNECTOR_TYPES = [
+  'Mennekes T2',
+  'CCS Combo 2',
+  'Schuko AC',
+  'J1772 T1',
+  'GB/T DC',
+  'NACS',
+  'CHAdeMO',
+];
+
+export default function ActionBar({
+  charger,
+  connectorId,
+  busy,
+  idTag = 'CARD-7F2A91',
+  onIdTagChange,
+  onPlug,
+  onStart,
+  onStop,
+  onEmergency,
+  onFault,
+  onClearFault,
+  onSuspend,
+  onType,
+  onName,
+  onPower,
+  onSoc,
+  onReconnect,
+  onReset,
+  onAddTag,
+  onAuthMode,
+}) {
+  const [stopReason, setStopReason] = useState('Local');
+  const [faultCode, setFaultCode] = useState('OverCurrentFailure');
+  const [power, setPower] = useState(
+    charger?.connectors?.find((c) => c.number === connectorId)?.powerKw ?? charger?.powerKw ?? 22
+  );
+  const [connName, setConnName] = useState(`Connector ${connectorId}`);
+  const [soc, setSoc] = useState(20);
+  const [battery, setBattery] = useState(60);
+
+  const connector = charger?.connectors?.find((c) => c.number === connectorId);
+  const setIdTag = onIdTagChange || (() => {});
+
+  useEffect(() => {
+    if (connector?.powerKw != null) setPower(connector.powerKw);
+  }, [connectorId, connector?.powerKw]);
+
+  useEffect(() => {
+    setConnName(connector?.name || `Connector ${connectorId}`);
+  }, [connectorId, connector?.name]);
+
+  if (!charger) {
+    return (
+      <div className="action-bar muted">
+        <h2>Bench controls</h2>
+        <p>Commission a station to drive the Pier cabinet.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="action-bar">
+      <h2>Bench controls</h2>
+      <p className="action-sub">
+        Outlet {connectorId}
+        {connector?.name ? ` · ${connector.name}` : ''} · {connector?.status || '—'} ·{' '}
+        {connector?.powerKw ?? '—'} kW
+        <br />
+        <span className="action-tip">Primary controls are on the 3D charger face</span>
+      </p>
+
+      <RfidPad
+        value={idTag}
+        onChange={setIdTag}
+        presets={charger.localAuthTags || []}
+        onAddTag={onAddTag}
+      />
+
+      <section className="ctrl-section">
+        <h3>Auth mode</h3>
+        <p className="action-tip">
+          CMS rejected demo tags → use Local or CMS (default) or a real CMS RFID
+        </p>
+        <select
+          value={charger.authMode || 'local_or_csms'}
+          onChange={(e) => onAuthMode(e.target.value)}
+        >
+          <option value="local_or_csms">Local or CMS (recommended)</option>
+          <option value="local">Local list only</option>
+          <option value="csms">CMS only (strict)</option>
+        </select>
+      </section>
+
+      <section className="ctrl-section">
+        <h3>Cable</h3>
+        <div className="btn-row">
+          <button type="button" disabled={busy} onClick={() => onPlug(true)}>
+            Plug in
+          </button>
+          <button type="button" disabled={busy} onClick={() => onPlug(false)}>
+            Unplug
+          </button>
+        </div>
+      </section>
+
+      <section className="ctrl-section">
+        <h3>Session</h3>
+        <div className="btn-row">
+          <button type="button" className="accent" disabled={busy} onClick={() => onStart(idTag)}>
+            Start charge
+          </button>
+          <button type="button" disabled={busy} onClick={() => onStop(stopReason)}>
+            Stop
+          </button>
+        </div>
+        <label>
+          Stop reason
+          <select value={stopReason} onChange={(e) => setStopReason(e.target.value)}>
+            {STOP_REASONS.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button type="button" className="danger" disabled={busy} onClick={onEmergency}>
+          Emergency stop
+        </button>
+      </section>
+
+      <section className="ctrl-section">
+        <h3>Suspend</h3>
+        <div className="btn-row">
+          <button type="button" disabled={busy} onClick={() => onSuspend('EV')}>
+            EV pause
+          </button>
+          <button type="button" disabled={busy} onClick={() => onSuspend('EVSE')}>
+            EVSE pause
+          </button>
+          <button type="button" disabled={busy} onClick={() => onSuspend(null)}>
+            Resume
+          </button>
+        </div>
+      </section>
+
+      <section className="ctrl-section">
+        <h3>Faults</h3>
+        <select value={faultCode} onChange={(e) => setFaultCode(e.target.value)}>
+          {ERROR_CODES.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+        <div className="btn-row">
+          <button type="button" disabled={busy} onClick={() => onFault(faultCode)}>
+            Inject fault
+          </button>
+          <button type="button" disabled={busy} onClick={onClearFault}>
+            Clear
+          </button>
+        </div>
+      </section>
+
+      <section className="ctrl-section">
+        <h3>Hardware</h3>
+        <label>
+          Connector name
+          <div className="inline-apply">
+            <input
+              value={connName}
+              onChange={(e) => setConnName(e.target.value)}
+              maxLength={40}
+              placeholder={`Connector ${connectorId}`}
+            />
+            <button
+              type="button"
+              disabled={busy || !onName}
+              onClick={() => onName?.(connName)}
+            >
+              Apply
+            </button>
+          </div>
+        </label>
+        <label>
+          Connector type
+          <select
+            value={connector?.type || 'Mennekes T2'}
+            onChange={(e) => onType(e.target.value)}
+          >
+            {CONNECTOR_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          This outlet power (kW)
+          <div className="inline-apply">
+            <input
+              type="number"
+              min="1"
+              max="350"
+              step="0.1"
+              value={power}
+              onChange={(e) => setPower(e.target.value)}
+            />
+            <button type="button" disabled={busy} onClick={() => onPower(Number(power))}>
+              Apply
+            </button>
+          </div>
+        </label>
+        <label>
+          SoC / Battery kWh
+          <div className="inline-apply">
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={soc}
+              onChange={(e) => setSoc(e.target.value)}
+              title="SoC %"
+            />
+            <input
+              type="number"
+              min="1"
+              max="200"
+              value={battery}
+              onChange={(e) => setBattery(e.target.value)}
+              title="Battery kWh"
+            />
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onSoc(Number(soc), Number(battery))}
+            >
+              Set
+            </button>
+          </div>
+        </label>
+      </section>
+
+      <section className="ctrl-section">
+        <h3>Link</h3>
+        <div className="btn-row">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onReconnect(charger.requireSubprotocol)}
+          >
+            Reconnect
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onReconnect(!charger.requireSubprotocol)}
+          >
+            Reconnect {charger.requireSubprotocol ? 'without' : 'with'} subprotocol
+          </button>
+        </div>
+        <div className="btn-row">
+          <button type="button" disabled={busy} onClick={() => onReset('Soft')}>
+            Soft reset
+          </button>
+          <button type="button" disabled={busy} onClick={() => onReset('Hard')}>
+            Hard reset
+          </button>
+        </div>
+        {charger.lastError && <p className="link-error">{charger.lastError}</p>}
+      </section>
+    </div>
+  );
+}
