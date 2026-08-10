@@ -1,13 +1,13 @@
 # Pier — OCPP 1.6 Charge Point Lab
 
-Browser console for a **Charge Point / EVSE** that speaks OCPP 1.6 JSON over WebSocket to any CSMS. Built as a standalone Node + React project (not derived from other simulator trees in this download folder).
+Browser console for a **Charge Point / EVSE** that speaks OCPP 1.6 JSON over WebSocket to any CSMS. Built as a standalone Node + React project.
 
 ## What it does
 
 - Full Core Charge Point client: Boot, Heartbeat, Status, Authorize, Start/Stop, MeterValues
 - RemoteStart/Stop, Reset, Unlock, ChangeAvailability, Config, TriggerMessage, LocalList, DataTransfer, Reserve
 - Per-outlet state machine and metering
-- Interactive Pier cabinet UI (outlets, LCD soft-keys, RFID pad, car plug scene)
+- Interactive Pier cabinet UI (touch screen, soft-keys, RFID pad, multi-outlet)
 - Auth modes: CSMS-only, local list, or local-or-CSMS
 - Optional `ocpp1.6` subprotocol + Basic Auth
 
@@ -26,8 +26,8 @@ npm run install:all
 npm run dev
 ```
 
-- UI: http://localhost:5173  
-- API: http://localhost:8787  
+- UI: http://localhost:5173
+- API: http://localhost:8787
 
 ## Connect to a CSMS
 
@@ -41,14 +41,10 @@ npm run smoke
 node scripts/probe-cms.mjs wss://your-csms.example/ocpp/1.6 YOUR-CP-ID
 ```
 
-## 3D yard
+## Docs
 
-The center stage includes an interactive Three.js scene (`client/src/components/scene3d/`):
-- Procedural **Pier** pedestal charger with selectable outlets
-- Procedural **EV** hatch with charge port
-- Cable that connects when plugged
-
-Drag to orbit. Click the car to plug/unplug; click an outlet to select (double-click to plug).
+- `docs/Pier-Simulator-Guide.docx` — how Pier works and how parts connect
+- `docs/OCPP-1.6-Guide.docx` — short OCPP 1.6 overview
 
 ## Layout
 
@@ -57,4 +53,13 @@ evse-ocpp16-console/
   server/     Express + Socket.IO + OCPP Charge Point
   client/     Vite + React Pier console
   scripts/    Local smoke + CSMS probe
+  docs/       Guides (Word + Markdown)
 ```
+
+## Connection model
+
+```
+Browser (UI) --REST/Socket.IO--> Pier backend --OCPP WebSocket--> CMS
+```
+
+The browser never opens the OCPP socket; only the Pier Node process does.

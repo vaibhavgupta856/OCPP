@@ -179,9 +179,9 @@ export default function EvYard3D(props) {
         <SceneContent {...props} />
       </Canvas>
       <div className="ev-yard-legend">
+        <span>Touch the CP screen buttons</span>
+        <span>Physical keys are backup</span>
         <span>Drag orbit · scroll zoom</span>
-        <span>Big screen + soft-keys on CP</span>
-        <span>Click screen to cycle pages</span>
         <span className="yard-state">
           {selectedConnectors.length > 1
             ? `Selected C${selectedConnectors.join(', C')}`

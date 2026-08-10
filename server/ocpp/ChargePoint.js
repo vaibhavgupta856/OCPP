@@ -289,6 +289,7 @@ export class ChargePoint {
 
     try {
       await this.sendBootNotification();
+      this.normalizeIdleStatuses();
       await this.sendAllStatusNotifications();
       await this.announceConnectors();
       this.restartHeartbeat();
@@ -529,6 +530,31 @@ export class ChargePoint {
     for (const c of this.connectors) {
       await this.sendStatusNotification(c.number);
     }
+  }
+
+  /** Clear stuck Finishing/Preparing with no active tx before announcing to CMS */
+  normalizeIdleStatuses() {
+    for (const c of this.connectors) {
+      if (c.number === 0) continue;
+      if (c.transactionId) continue;
+      if (
+        c.status === ConnectorStatus.Finishing ||
+        c.status === ConnectorStatus.Preparing ||
+        c.status === ConnectorStatus.SuspendedEV ||
+        c.status === ConnectorStatus.SuspendedEVSE
+      ) {
+        c.cablePlugged = false;
+        c.locked = false;
+        c.idTag = null;
+        const next =
+          c.availability === 'Inoperative'
+            ? ConnectorStatus.Unavailable
+            : ConnectorStatus.Available;
+        transition(c, next, { force: true });
+        this.log('info', `Normalized C${c.number} → ${next}`);
+      }
+    }
+    this.broadcastState();
   }
 
   /**
@@ -811,18 +837,24 @@ export class ChargePoint {
     connector.locked = false;
     connector.meterWh = snap.meterWh;
 
+    // Brief Finishing so CMS sees session end, then return to a usable state.
     transition(connector, ConnectorStatus.Finishing, { force: true });
     await this.sendStatusNotification(connector.number);
 
-    if (!connector.cablePlugged) {
-      transition(connector, ConnectorStatus.Available, { force: true });
-      await this.sendStatusNotification(connector.number);
-    } else if (connector.availability === 'Inoperative') {
-      transition(connector, ConnectorStatus.Unavailable, { force: true });
-      await this.sendStatusNotification(connector.number);
+    // Lab behavior: after stop, release the session fully.
+    // Real CPs often stay Finishing until cable unplug; that left Massive stuck on Finishing.
+    if (reason !== 'EVDisconnected') {
+      connector.cablePlugged = false;
     }
 
-    this.log('info', `Tx ${txId} stopped (${reason})`);
+    if (connector.availability === 'Inoperative') {
+      transition(connector, ConnectorStatus.Unavailable, { force: true });
+    } else {
+      transition(connector, ConnectorStatus.Available, { force: true });
+    }
+    await this.sendStatusNotification(connector.number);
+
+    this.log('info', `Tx ${txId} stopped (${reason}) → ${connector.status}`);
     this.broadcastState();
   }
 
