@@ -67,7 +67,7 @@ export default function ConnectionDock({
   return (
     <div className="dock">
       <div className="dock-head">
-        <h2>Stations</h2>
+        <h2>Chargers</h2>
         <button type="button" className="ghost-btn" onClick={() => setOpen((v) => !v)}>
           {open ? 'Hide form' : 'Commission'}
         </button>
@@ -200,7 +200,7 @@ export default function ConnectionDock({
       )}
 
       <ul className="station-list">
-        {chargers.length === 0 && <li className="empty-list">No stations yet</li>}
+        {chargers.length === 0 && <li className="empty-list">No chargers yet</li>}
         {chargers.map((c) => (
           <li key={c.cpId}>
             <button

@@ -4,7 +4,7 @@
 
 const DEFAULTS = {
   HeartbeatInterval: '60',
-  MeterValueSampleInterval: '10',
+  MeterValueSampleInterval: '2',
   MeterValuesSampledData: 'Energy.Active.Import.Register,Power.Active.Import,Current.Import,Voltage,SoC',
   MeterValuesAlignedData: 'Energy.Active.Import.Register',
   ClockAlignedDataInterval: '0',

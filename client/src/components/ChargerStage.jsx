@@ -9,7 +9,7 @@ function YardFallback() {
     <div className="ev-yard-3d roomy yard-loading">
       <div className="yard-loading-card">
         <div className="yard-loading-spinner" />
-        <p>Loading station view…</p>
+        <p>Loading charger view…</p>
       </div>
     </div>
   );
@@ -30,6 +30,8 @@ export default function ChargerStage({
   onEmergency,
   onClearFault,
   onPower,
+  onAuthMode,
+  onAddTag,
 }) {
   const guns = charger.connectors.filter((c) => c.number > 0);
   const selected = selectedConnectors?.length ? selectedConnectors : [activeConnector];
@@ -127,6 +129,11 @@ export default function ChargerStage({
           cpId={charger.cpId}
           identity={charger.identity}
           firmwareStatus={charger.firmwareStatus}
+          tariff={{
+            energyRatePerKwh: charger.energyRatePerKwh,
+            currency: charger.currency,
+            currencySymbol: charger.currencySymbol,
+          }}
           busy={busy}
           onSelectOutlet={(n) => {
             onSelectConnector(n);
@@ -176,8 +183,25 @@ export default function ChargerStage({
               Acting on <strong>{targetLabel}</strong>
               {active.transactionId ? ` · Tx #${active.transactionId}` : ''}
               {` · ${active.status}`}
+              {` · ${((active.meterWh || 0) / 1000).toFixed(2)} kWh`}
+              {` · ${charger.currencySymbol || '₹'}${Number(active.sessionCost ?? 0).toFixed(2)}`}
+              {active.lastSessionCost != null && !active.transactionId
+                ? ` · last ${charger.currencySymbol || '₹'}${Number(active.lastSessionCost).toFixed(2)}`
+                : ''}
             </p>
           </div>
+          <label className="stage-tag inline">
+            Auth
+            <select
+              value={charger.authMode || 'local_or_csms'}
+              onChange={(e) => onAuthMode?.(e.target.value)}
+              title="Local demo tags and/or CMS-registered RFIDs"
+            >
+              <option value="local_or_csms">Local or CMS</option>
+              <option value="local">Local only</option>
+              <option value="csms">CMS only</option>
+            </select>
+          </label>
           <label className="stage-tag inline">
             idTag
             <input
@@ -192,7 +216,22 @@ export default function ChargerStage({
               ))}
             </datalist>
           </label>
+          {idTag && !(charger.localAuthTags || []).includes(idTag) ? (
+            <button
+              type="button"
+              className="cp-btn"
+              disabled={busy || !onAddTag}
+              onClick={() => onAddTag?.(idTag)}
+              title="Add this idTag to the local auth list"
+            >
+              Add to local list
+            </button>
+          ) : null}
         </header>
+        <p className="cp-2d-tip">
+          <strong>Local or CMS</strong>: demo tags (CARD-…) work locally; paste a Massive RFID for CMS-side auth.
+          Use <strong>CMS only</strong> when testing real Massive RFID cards.
+        </p>
         {tagsInUse.size > 0 ? (
           <p className="cp-2d-tip">
             In use now:{' '}

@@ -57,6 +57,7 @@ export default function ActionBar({
   onReset,
   onAddTag,
   onAuthMode,
+  onTariff,
 }) {
   const [stopReason, setStopReason] = useState('Local');
   const [faultCode, setFaultCode] = useState('OverCurrentFailure');
@@ -66,9 +67,11 @@ export default function ActionBar({
   const [connName, setConnName] = useState(`Connector ${connectorId}`);
   const [soc, setSoc] = useState(20);
   const [battery, setBattery] = useState(60);
+  const [rate, setRate] = useState(charger?.energyRatePerKwh ?? 18.5);
 
   const connector = charger?.connectors?.find((c) => c.number === connectorId);
   const setIdTag = onIdTagChange || (() => {});
+  const sym = charger?.currencySymbol || '₹';
 
   useEffect(() => {
     if (connector?.powerKw != null) setPower(connector.powerKw);
@@ -78,11 +81,15 @@ export default function ActionBar({
     setConnName(connector?.name || `Connector ${connectorId}`);
   }, [connectorId, connector?.name]);
 
+  useEffect(() => {
+    if (charger?.energyRatePerKwh != null) setRate(charger.energyRatePerKwh);
+  }, [charger?.energyRatePerKwh]);
+
   if (!charger) {
     return (
       <div className="action-bar muted">
         <h2>Bench controls</h2>
-        <p>Commission a station to drive the Massive cabinet.</p>
+        <p>Commission a charger to drive the Massive cabinet.</p>
       </div>
     );
   }
@@ -93,7 +100,15 @@ export default function ActionBar({
       <p className="action-sub">
         Outlet {connectorId}
         {connector?.name ? ` · ${connector.name}` : ''} · {connector?.status || '—'} ·{' '}
-        {connector?.powerKw ?? '—'} kW
+        {connector?.powerKw ?? '—'} kW · {((connector?.meterWh || 0) / 1000).toFixed(2)} kWh ·{' '}
+        {sym}
+        {Number(connector?.sessionCost ?? 0).toFixed(2)}
+        {connector?.smartLimitW != null
+          ? ` · smart limit ${(connector.smartLimitW / 1000).toFixed(1)} kW`
+          : ''}
+        {charger?.diagnosticsStatus && charger.diagnosticsStatus !== 'Idle'
+          ? ` · diagnostics ${charger.diagnosticsStatus}`
+          : ''}
         <br />
         <span className="action-tip">Primary controls are on the 3D charger face</span>
       </p>
@@ -236,6 +251,26 @@ export default function ActionBar({
               onChange={(e) => setPower(e.target.value)}
             />
             <button type="button" disabled={busy} onClick={() => onPower(Number(power))}>
+              Apply
+            </button>
+          </div>
+        </label>
+        <label>
+          Energy tariff ({sym}/kWh)
+          <div className="inline-apply">
+            <input
+              type="number"
+              min="0"
+              max="9999"
+              step="0.01"
+              value={rate}
+              onChange={(e) => setRate(e.target.value)}
+            />
+            <button
+              type="button"
+              disabled={busy || !onTariff}
+              onClick={() => onTariff?.({ energyRatePerKwh: Number(rate) })}
+            >
               Apply
             </button>
           </div>

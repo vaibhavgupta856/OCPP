@@ -163,7 +163,7 @@ export default function App() {
           </div>
         </div>
         <div className="top-meta">
-          <span className="meta-pill">{chargers.length} station{chargers.length === 1 ? '' : 's'}</span>
+          <span className="meta-pill">{chargers.length} charger{chargers.length === 1 ? '' : 's'}</span>
           {selected && (
             <span className={`meta-pill link-${selected.connectionState}`}>
               {selected.connectionState}
@@ -212,10 +212,12 @@ export default function App() {
               onPower={(connectorId, powerKw) =>
                 act('/power', { connectorId, powerKw })
               }
+              onAuthMode={(authMode) => act('/auth-mode', { authMode })}
+              onAddTag={(tag) => act('/local-tag', { idTag: tag })}
             />
           ) : (
             <div className="empty-stage">
-              <h2>No station on the bench</h2>
+              <h2>No charger on the bench</h2>
               <p>Commission a charge point from the left rail to open the yard.</p>
             </div>
           )}
@@ -251,6 +253,7 @@ export default function App() {
               onReset={(type) => act('/reset', { type })}
               onAddTag={(tag) => act('/local-tag', { idTag: tag })}
               onAuthMode={(authMode) => act('/auth-mode', { authMode })}
+              onTariff={(tariff) => act('/tariff', tariff)}
             />
           </aside>
         )}
@@ -268,6 +271,8 @@ export default function App() {
       <MessageTrace
         messages={messages.filter((m) => !selectedId || m.cpId === selectedId)}
         logs={logs.filter((l) => !selectedId || l.cpId === selectedId)}
+        connectors={selected?.connectors || []}
+        activeConnector={activeConnector}
         onClear={() => {
           setMessages([]);
           setLogs([]);

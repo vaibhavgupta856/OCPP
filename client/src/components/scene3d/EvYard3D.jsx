@@ -1,7 +1,26 @@
-import { useMemo } from 'react';
+import { Component, Suspense, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { ContactShadows, Environment, OrbitControls } from '@react-three/drei';
+import * as THREE from 'three';
 import MassiveChargerMesh from './MassiveChargerMesh.jsx';
+
+/** If HDR env fails/suspends oddly, keep the charger visible */
+class EnvGuard extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { failed: false };
+  }
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch() {
+    /* ignore — fall back to lights-only */
+  }
+  render() {
+    if (this.state.failed) return null;
+    return this.props.children;
+  }
+}
 
 /** Simple pad under the charger — no canopy / tent / clouds */
 function StationPad() {
@@ -9,17 +28,58 @@ function StationPad() {
     <group>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0.2]} receiveShadow>
         <planeGeometry args={[8, 8]} />
-        <meshStandardMaterial color="#3a3f48" roughness={0.95} />
+        <meshStandardMaterial color="#3a3f48" roughness={0.92} metalness={0.08} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0.15]} receiveShadow>
-        <planeGeometry args={[4.2, 3.6]} />
-        <meshStandardMaterial color="#d1d5db" roughness={0.88} />
+        <planeGeometry args={[3.2, 2.8]} />
+        <meshStandardMaterial color="#c9ced6" roughness={0.78} metalness={0.12} />
       </mesh>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
         <circleGeometry args={[14, 32]} />
-        <meshStandardMaterial color="#e5e7eb" roughness={1} />
+        <meshStandardMaterial color="#e5e7eb" roughness={1} metalness={0} />
       </mesh>
     </group>
+  );
+}
+
+function SceneLights() {
+  return (
+    <>
+      <hemisphereLight args={['#ffffff', '#a8b0bd', 0.45]} />
+      <ambientLight intensity={0.28} />
+      <directionalLight
+        castShadow
+        position={[7.5, 13, 6.5]}
+        intensity={2.05}
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
+        shadow-camera-far={30}
+        shadow-camera-left={-8}
+        shadow-camera-right={8}
+        shadow-camera-top={8}
+        shadow-camera-bottom={-8}
+        shadow-bias={-0.0002}
+        color="#fff8f2"
+      />
+      <directionalLight position={[-7, 6, -5]} intensity={0.85} color="#e8f0ff" />
+      <directionalLight position={[0, 8, 10]} intensity={0.7} color="#ffffff" />
+      <spotLight
+        position={[1.5, 9, 7]}
+        angle={0.38}
+        penumbra={0.45}
+        intensity={1.6}
+        color="#ffffff"
+        castShadow={false}
+      />
+      <spotLight
+        position={[-2.5, 6, 5]}
+        angle={0.5}
+        penumbra={0.6}
+        intensity={0.9}
+        color="#ffe8e4"
+        castShadow={false}
+      />
+    </>
   );
 }
 
@@ -34,6 +94,7 @@ function SceneContent(props) {
     busy,
     identity,
     firmwareStatus,
+    tariff,
     onSelectOutlet,
     onToggleSelectOutlet,
     onOutletPlug,
@@ -48,24 +109,17 @@ function SceneContent(props) {
 
   return (
     <>
-      <color attach="background" args={['#eef1f5']} />
-      <fog attach="fog" args={['#e8ecf1', 18, 42]} />
+      <color attach="background" args={['#e8ecf2']} />
+      <fog attach="fog" args={['#e4e8ef', 20, 48]} />
 
-      <hemisphereLight args={['#ffffff', '#c4c9d2', 0.7]} />
-      <ambientLight intensity={0.6} />
-      <directionalLight
-        castShadow
-        position={[8, 14, 8]}
-        intensity={1.25}
-        shadow-mapSize-width={1024}
-        shadow-mapSize-height={1024}
-        shadow-camera-far={30}
-        shadow-camera-left={-8}
-        shadow-camera-right={8}
-        shadow-camera-top={8}
-        shadow-camera-bottom={-8}
-        color="#fff8f6"
-      />
+      <SceneLights />
+
+      {/* Environment HDR is optional — never unmount the charger if it fails */}
+      <EnvGuard>
+        <Suspense fallback={null}>
+          <Environment preset="studio" />
+        </Suspense>
+      </EnvGuard>
 
       <StationPad />
 
@@ -79,6 +133,7 @@ function SceneContent(props) {
         cpId={cpId}
         identity={identity}
         firmwareStatus={firmwareStatus}
+        tariff={tariff}
         busy={busy}
         onSelectOutlet={onSelectOutlet}
         onToggleSelectOutlet={onToggleSelectOutlet}
@@ -90,14 +145,24 @@ function SceneContent(props) {
         onTapCard={onTapCard}
       />
 
+      <ContactShadows
+        position={[0, 0.02, 0]}
+        opacity={0.4}
+        scale={12}
+        blur={2.4}
+        far={8}
+        resolution={512}
+        color="#1a1f28"
+      />
+
       <OrbitControls
         makeDefault
         enablePan
         minPolarAngle={0.2}
         maxPolarAngle={1.45}
-        minDistance={4}
-        maxDistance={18}
-        target={[0, 2.4, 0]}
+        minDistance={3.5}
+        maxDistance={16}
+        target={[0, 2.1, 0]}
       />
     </>
   );
@@ -113,15 +178,24 @@ export default function EvYard3D(props) {
     <div className="ev-yard-3d roomy">
       <Canvas
         shadows
-        dpr={[1, 1.5]}
-        camera={{ position: [6.8, 4.6, 8.2], fov: 38 }}
-        gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
+        dpr={[1, 1.75]}
+        camera={{ position: [5.8, 3.8, 7.2], fov: 38 }}
+        gl={{
+          antialias: true,
+          alpha: false,
+          powerPreference: 'high-performance',
+          toneMapping: THREE.ACESFilmicToneMapping,
+          toneMappingExposure: 1.22,
+        }}
+        onCreated={({ gl }) => {
+          gl.setClearColor('#e8ecf2');
+        }}
       >
         <SceneContent {...props} />
       </Canvas>
       <div className="ev-yard-legend">
-        <span>Touch the CP screen</span>
-        <span>Physical keys below screen</span>
+        <span>Touch the HMI screen</span>
+        <span>Guns on the sides · double-click to plug</span>
         <span>Drag orbit · scroll zoom</span>
         <span className="yard-state">
           {selectedConnectors.length > 1

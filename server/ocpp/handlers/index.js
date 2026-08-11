@@ -34,11 +34,40 @@ export async function handleRemoteStartTransaction(cp, payload) {
     if (!connector) return { status: 'Rejected' };
   }
 
-  if (cp.config.getBool('AuthorizeRemoteTxRequests', true)) {
-    const auth = await cp.authorizeIdTag(idTag);
-    if (auth !== 'Accepted') {
+  const mode = cp.authMode || 'local_or_csms';
+  const localOk = cp.localAuthList.get(idTag)?.status === 'Accepted';
+
+  // Auth for RemoteStart:
+  // - local mode: must be on local list
+  // - local_or_csms: local list OK, OR trust CSMS (it already chose this idTag)
+  // - csms: trust CSMS RemoteStart (do not round-trip Authorize — that was rejecting Massive starts)
+  if (mode === 'local') {
+    if (!localOk) {
+      cp.log('warn', `RemoteStart rejected — idTag "${idTag}" not on local list`);
       return { status: 'Rejected' };
     }
+  } else if (cp.config.getBool('AuthorizeRemoteTxRequests', true) && !localOk && mode === 'csms') {
+    // Optional soft Authorize for strict CMS mode only when tag isn't local
+    try {
+      const auth = await cp.authorizeIdTag(idTag);
+      if (auth !== 'Accepted') {
+        // Still trust RemoteStart from CSMS — they initiated it with this idTag
+        cp.log(
+          'warn',
+          `RemoteStart: CMS Authorize=${auth} for "${idTag}" — accepting because CSMS requested RemoteStart`
+        );
+      }
+    } catch (err) {
+      cp.log('warn', `RemoteStart Authorize skipped/failed: ${err.message} — trusting CSMS`);
+    }
+  } else {
+    cp.log('info', `RemoteStart accepted for "${idTag}" (mode=${mode}, local=${localOk})`);
+  }
+
+  // Ensure tag is on local list so StartTransaction lab override can apply if CMS returns Invalid
+  if (!cp.localAuthList.has(idTag)) {
+    cp.localAuthList.set(idTag, { status: 'Accepted' });
+    cp.log('info', `RemoteStart: added "${idTag}" to local auth list for this session`);
   }
 
   // Auto-plug for remote start convenience (real EVSE may already be plugged)
@@ -48,14 +77,25 @@ export async function handleRemoteStartTransaction(cp, payload) {
 
   cp.emitUi('remote_start', { connectorId: connector.number, idTag });
 
-  // Fire and forget session start
-  setImmediate(() => {
-    cp.beginTransaction(connector.number, idTag, { reason: 'Remote' }).catch((err) => {
-      cp.log('error', `RemoteStart failed: ${err.message}`);
-    });
-  });
-
-  return { status: 'Accepted' };
+  // Begin tx AFTER RemoteStart.conf is on the wire (same pattern as TriggerMessage → Boot)
+  const targetConnectorId = connector.number;
+  const startIdTag = idTag;
+  return {
+    status: 'Accepted',
+    __after: async (inst) => {
+      try {
+        await inst.beginTransaction(targetConnectorId, startIdTag, { reason: 'Remote' });
+      } catch (err) {
+        inst.log('error', `RemoteStart failed: ${err.message}`);
+        const c = inst.getConnector(targetConnectorId);
+        if (c && !c.transactionId && c.status === ConnectorStatus.Preparing) {
+          transition(c, ConnectorStatus.Available, { force: true });
+          await inst.sendStatusNotification(c.number).catch(() => {});
+          inst.broadcastState();
+        }
+      }
+    },
+  };
 }
 
 export async function handleRemoteStopTransaction(cp, payload) {
@@ -141,12 +181,27 @@ export async function handleGetConfiguration(cp, payload) {
 }
 
 export async function handleChangeConfiguration(cp, payload) {
-  const status = cp.config.change(payload.key, payload.value);
+  // CMS UIs sometimes send alternate spellings
+  let key = payload.key;
+  let value = payload.value;
+  if (typeof key === 'string') {
+    const aliases = {
+      heartbeatinterval: 'HeartbeatInterval',
+      heartbeat_interval: 'HeartbeatInterval',
+      heartbeatsinterval: 'HeartbeatInterval',
+      metervaluesampleinterval: 'MeterValueSampleInterval',
+      meter_value_sample_interval: 'MeterValueSampleInterval',
+    };
+    const mapped = aliases[key.toLowerCase().replace(/\s+/g, '')];
+    if (mapped) key = mapped;
+  }
+
+  const status = cp.config.change(key, value);
   if (status === 'Accepted') {
-    if (payload.key === 'HeartbeatInterval') {
+    if (key === 'HeartbeatInterval') {
       cp.restartHeartbeat();
     }
-    if (payload.key === 'MeterValueSampleInterval') {
+    if (key === 'MeterValueSampleInterval') {
       cp.restartMeterLoops();
     }
     cp.broadcastState();
@@ -155,43 +210,113 @@ export async function handleChangeConfiguration(cp, payload) {
 }
 
 export async function handleTriggerMessage(cp, payload) {
-  const requested = payload.requestedMessage;
-  const connectorId = payload.connectorId;
+  const body = payload && typeof payload === 'object' ? payload : {};
+  // Massive / some CMS UIs may vary key casing
+  const raw =
+    body.requestedMessage ??
+    body.RequestedMessage ??
+    body.requestedmessage ??
+    body.REQUESTEDMESSAGE ??
+    Object.entries(body).find(([k]) => k.toLowerCase() === 'requestedmessage')?.[1];
+  const requested = String(raw ?? '').trim();
+  const connectorId =
+    body.connectorId ??
+    body.ConnectorId ??
+    Object.entries(body).find(([k]) => k.toLowerCase() === 'connectorid')?.[1];
 
-  switch (requested) {
-    case 'BootNotification':
-      setImmediate(() => cp.sendBootNotification().catch(() => {}));
-      return { status: 'Accepted' };
-    case 'Heartbeat':
-      setImmediate(() => cp.sendHeartbeat().catch(() => {}));
-      return { status: 'Accepted' };
-    case 'StatusNotification': {
-      if (connectorId !== undefined && connectorId !== null) {
-        const c = cp.getConnector(connectorId);
-        if (!c) return { status: 'Rejected' };
-        setImmediate(() => cp.sendStatusNotification(connectorId).catch(() => {}));
-      } else {
-        setImmediate(() => cp.sendAllStatusNotifications().catch(() => {}));
-      }
-      return { status: 'Accepted' };
-    }
-    case 'MeterValues': {
-      const id = connectorId && connectorId > 0 ? connectorId : 1;
-      const c = cp.getConnector(id);
-      if (!c || !c.transactionId) return { status: 'Rejected' };
-      setImmediate(() => cp.sendMeterValues(id).catch(() => {}));
-      return { status: 'Accepted' };
-    }
-    case 'DiagnosticsStatusNotification':
-      return { status: 'NotImplemented' };
-    case 'FirmwareStatusNotification':
-      setImmediate(() => {
-        cp.sendFirmwareStatusNotification(cp.firmware?.status || 'Idle').catch(() => {});
-      });
-      return { status: 'Accepted' };
-    default:
-      return { status: 'NotImplemented' };
+  // Normalize in case CMS sends odd casing / spacing / dashes
+  const key = requested.toLowerCase().replace(/[\s_-]+/g, '');
+
+  cp.log('info', `TriggerMessage requested="${requested}" key="${key}"`, { payload: body });
+
+  if (key === 'bootnotification') {
+    return {
+      status: 'Accepted',
+      chargePointVendor: cp.identity?.chargePointVendor || null,
+      chargePointModel: cp.identity?.chargePointModel || null,
+      chargePointSerialNumber: cp.identity?.chargePointSerialNumber || null,
+      firmwareVersion: cp.identity?.firmwareVersion || null,
+      // Run AFTER TriggerMessage.conf is on the wire — otherwise Massive often never logs Boot
+      __after: async (inst) => {
+        const conf = await inst.sendBootNotification();
+        inst.log('info', `TriggerMessage → BootNotification done (${conf?.status})`);
+        await inst.sendAllStatusNotifications();
+      },
+    };
   }
+  if (key === 'heartbeat') {
+    return {
+      status: 'Accepted',
+      __after: async (inst) => {
+        await inst.sendHeartbeat();
+        inst.log('info', 'TriggerMessage → Heartbeat sent');
+      },
+    };
+  }
+  if (key === 'statusnotification') {
+    if (connectorId !== undefined && connectorId !== null && connectorId !== '') {
+      const c = cp.getConnector(Number(connectorId));
+      if (!c) return { status: 'Rejected' };
+      return {
+        status: 'Accepted',
+        __after: async (inst) => {
+          await inst.sendStatusNotification(Number(connectorId));
+          inst.log('info', `TriggerMessage → StatusNotification C${connectorId} sent`);
+        },
+      };
+    }
+    return {
+      status: 'Accepted',
+      __after: async (inst) => {
+        await inst.sendAllStatusNotifications();
+        inst.log('info', 'TriggerMessage → StatusNotification (all) sent');
+      },
+    };
+  }
+  if (key === 'metervalues') {
+    const id = connectorId && Number(connectorId) > 0 ? Number(connectorId) : 1;
+    const c = cp.getConnector(id);
+    if (!c || !c.transactionId) return { status: 'Rejected' };
+    return {
+      status: 'Accepted',
+      __after: async (inst) => {
+        await inst.sendMeterValues(id);
+        inst.log('info', `TriggerMessage → MeterValues C${id} sent`);
+      },
+    };
+  }
+  if (key === 'diagnosticsstatusnotification' || key === 'diagnosticsstatus') {
+    const details = cp.getDiagnosticsDetails();
+    return {
+      status: 'Accepted',
+      diagnosticsStatus: details.status,
+      fileName: details.fileName,
+      location: details.location,
+      startTime: details.startTime,
+      stopTime: details.stopTime,
+      __after: async (inst) => {
+        await inst.sendDiagnosticsStatusNotification(details.status);
+        inst.log('info', `TriggerMessage → DiagnosticsStatusNotification (${details.status}) sent`);
+      },
+    };
+  }
+  if (key === 'firmwarestatusnotification' || key === 'firmwarestatus') {
+    const details = cp.getFirmwareDetails();
+    return {
+      status: 'Accepted',
+      firmwareStatus: details.status,
+      firmwareVersion: details.firmwareVersion,
+      location: details.location,
+      retrieveDate: details.retrieveDate,
+      __after: async (inst) => {
+        await inst.sendFirmwareStatusNotification(details.status);
+        inst.log('info', `TriggerMessage → FirmwareStatusNotification (${details.status}) sent`);
+      },
+    };
+  }
+
+  cp.log('warn', `TriggerMessage not implemented for "${requested}" payload=${JSON.stringify(body)}`);
+  return { status: 'NotImplemented' };
 }
 
 export async function handleClearCache(cp) {
@@ -200,7 +325,18 @@ export async function handleClearCache(cp) {
 }
 
 export async function handleGetLocalListVersion(cp) {
-  return { listVersion: cp.localAuthListVersion };
+  // OCPP 1.6 GetLocalListVersion.conf only requires listVersion.
+  // There is no GetLocalList — CMS pushes tags via SendLocalList.
+  // Extra fields below are for Massive CMS / lab visibility of what this CP holds.
+  const localAuthorizationList = [...cp.localAuthList.entries()].map(([idTag, idTagInfo]) => ({
+    idTag,
+    idTagInfo: idTagInfo || { status: 'Accepted' },
+  }));
+  return {
+    listVersion: cp.localAuthListVersion,
+    localAuthorizationList,
+    idTags: localAuthorizationList.map((e) => e.idTag),
+  };
 }
 
 export async function handleSendLocalList(cp, payload) {
@@ -295,7 +431,7 @@ export async function handleUpdateFirmware(cp, payload) {
     retries: payload.retries,
     retryInterval: payload.retryInterval,
   });
-  // UpdateFirmware.conf is empty object
+  // UpdateFirmware.conf is empty per OCPP; progress comes via FirmwareStatusNotification
   return {};
 }
 
@@ -319,11 +455,50 @@ export async function handleCancelReservation(cp, payload) {
   return { status: 'Accepted' };
 }
 
+export async function handleGetDiagnostics(cp, payload) {
+  if (!payload?.location) {
+    return {};
+  }
+  const result = cp.beginDiagnosticsUpload({
+    location: payload.location,
+    retries: payload.retries,
+    retryInterval: payload.retryInterval,
+    startTime: payload.startTime,
+    stopTime: payload.stopTime,
+  });
+  // OCPP GetDiagnostics.conf: fileName is the standard field
+  return { fileName: result.fileName };
+}
+
+export async function handleSetChargingProfile(cp, payload) {
+  const connectorId = payload.connectorId;
+  if (typeof connectorId !== 'number') {
+    return { status: 'Rejected' };
+  }
+  return cp.setChargingProfile(connectorId, payload.csChargingProfiles);
+}
+
+export async function handleClearChargingProfile(cp, payload = {}) {
+  return cp.clearChargingProfile({
+    id: payload.id,
+    connectorId: payload.connectorId,
+    chargingProfilePurpose: payload.chargingProfilePurpose,
+    stackLevel: payload.stackLevel,
+  });
+}
+
+export async function handleGetCompositeSchedule(cp, payload) {
+  if (typeof payload.connectorId !== 'number' || typeof payload.duration !== 'number') {
+    return { status: 'Rejected' };
+  }
+  return cp.getCompositeSchedule(payload.connectorId, payload.duration, payload.chargingRateUnit);
+}
+
 export async function handleChangeConfigurationKeys(cp, payload) {
   return handleChangeConfiguration(cp, payload);
 }
 
-/** Dispatch map */
+/** Dispatch map — full OCPP 1.6 CSMS → CP set */
 export const inboundHandlers = {
   RemoteStartTransaction: handleRemoteStartTransaction,
   RemoteStopTransaction: handleRemoteStopTransaction,
@@ -340,4 +515,8 @@ export const inboundHandlers = {
   ReserveNow: handleReserveNow,
   CancelReservation: handleCancelReservation,
   UpdateFirmware: handleUpdateFirmware,
+  GetDiagnostics: handleGetDiagnostics,
+  SetChargingProfile: handleSetChargingProfile,
+  ClearChargingProfile: handleClearChargingProfile,
+  GetCompositeSchedule: handleGetCompositeSchedule,
 };

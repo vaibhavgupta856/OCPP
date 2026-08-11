@@ -448,6 +448,17 @@ Default BootNotification identity in the simulator:
 
 Remember: **the browser never speaks OCPP**. Only the simulator backend does.
 
+### Smart charging & diagnostics (full OCPP 1.6 coverage)
+
+| CMS → CP | CP behavior |
+|----------|-------------|
+| **SetChargingProfile** | Stores profile; caps live meter power; limit `0` → `SuspendedEVSE` |
+| **ClearChargingProfile** | Removes matching profiles; restores rated power |
+| **GetCompositeSchedule** | Returns absolute composite schedule from active profiles |
+| **GetDiagnostics** | Returns `fileName`, then **DiagnosticsStatusNotification** `Uploading` → `Uploaded` → `Idle` |
+
+Feature profiles advertised: `Core,FirmwareManagement,LocalAuthListManagement,Reservation,RemoteTrigger,SmartCharging`.
+
 ---
 
 *OCPP 1.6 JSON practical guide for the Massive Mobility Charging Simulator. For normative field-level schema, refer to the official OCPP 1.6 specification from the Open Charge Alliance.*

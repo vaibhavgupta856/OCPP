@@ -42,6 +42,7 @@ export default function ChargerLcdScreen({
   cpId,
   identity = null,
   firmwareStatus = 'Idle',
+  tariff = null,
   position = [0, 2.15, 0.52],
   size = [1.55, 1.15],
   page = 'home',
@@ -52,15 +53,18 @@ export default function ChargerLcdScreen({
   onPlug,
   onTapCard,
   onClearFault,
+  onSelectOutlet,
 }) {
   const meshRef = useRef();
   const pageRef = useRef(page);
   const hitZonesRef = useRef([]);
   const identityRef = useRef(identity);
   const fwStatusRef = useRef(firmwareStatus);
+  const tariffRef = useRef(tariff);
   pageRef.current = page;
   identityRef.current = identity;
   fwStatusRef.current = firmwareStatus;
+  tariffRef.current = tariff;
 
   const { texture, ctx, canvas } = useMemo(() => {
     const c = document.createElement('canvas');
@@ -83,6 +87,13 @@ export default function ChargerLcdScreen({
     const kwh = ((c?.meterWh || 0) / 1000).toFixed(2);
     const kw = ((c?.powerW || 0) / 1000).toFixed(1);
     const rated = c?.powerKw ?? '—';
+    const sym = tariffRef.current?.currencySymbol || '₹';
+    const rate = tariffRef.current?.energyRatePerKwh ?? 18.5;
+    const costNum =
+      c?.sessionCost != null
+        ? Number(c.sessionCost)
+        : Number((((c?.meterWh || 0) / 1000) * rate).toFixed(2));
+    const costText = `${sym}${costNum.toFixed(2)}`;
     const view = pageRef.current;
     const isTx = !!c?.transactionId;
     const plugged = !!c?.cablePlugged;
@@ -133,6 +144,7 @@ export default function ChargerLcdScreen({
         `Firmware ${idn.firmwareVersion || 'Massive-CPS-16.3.2.1'}`,
         `FW state ${fwStatusRef.current || 'Idle'}`,
         'Protocol OCPP 1.6J',
+        `Tariff  ${(tariffRef.current?.currencySymbol || '₹')}${Number(tariffRef.current?.energyRatePerKwh ?? 18.5).toFixed(2)}/kWh`,
       ].forEach((line, i) => ctx.fillText(line, 40, contentTop + 90 + i * 42));
       ctx.fillStyle = '#e8a3aa';
       ctx.font = '20px system-ui, Segoe UI, sans-serif';
@@ -142,12 +154,22 @@ export default function ChargerLcdScreen({
       ctx.fillStyle = '#ffb3bb';
       ctx.font = 'bold 34px system-ui, Segoe UI, sans-serif';
       ctx.fillText('Outlets', 40, contentTop + 36);
+      ctx.fillStyle = '#e8a3aa';
+      ctx.font = '20px system-ui, Segoe UI, sans-serif';
+      ctx.fillText('Tap a row to focus that connector', 40, contentTop + 70);
       guns.forEach((g, i) => {
-        const y = contentTop + 70 + i * 88;
+        const y = contentTop + 90 + i * 88;
         if (y + 70 > contentBottom) return;
-        ctx.fillStyle = '#3a1a22';
+        const focused = g.number === c?.number;
+        ctx.fillStyle = focused ? '#5a2030' : '#3a1a22';
         roundRect(ctx, 40, y, W - 80, 76, 12);
         ctx.fill();
+        if (focused) {
+          ctx.strokeStyle = '#ffb3bb';
+          ctx.lineWidth = 3;
+          roundRect(ctx, 40, y, W - 80, 76, 12);
+          ctx.stroke();
+        }
         ctx.fillStyle = g.status === 'Charging' ? '#ffb3bb' : '#fff5f6';
         ctx.font = 'bold 28px system-ui, Segoe UI, sans-serif';
         ctx.fillText(`C${g.number}`, 60, y + 46);
@@ -169,24 +191,32 @@ export default function ChargerLcdScreen({
       ctx.fillText(`Outlet C${c?.number ?? '—'} · Rated ${rated} kW`, 40, contentTop + 100);
 
       ctx.fillStyle = '#3a1a22';
-      roundRect(ctx, 40, contentTop + 130, 450, 150, 14);
+      roundRect(ctx, 40, contentTop + 130, 300, 150, 14);
       ctx.fill();
-      roundRect(ctx, 520, contentTop + 130, 450, 150, 14);
+      roundRect(ctx, 360, contentTop + 130, 300, 150, 14);
+      ctx.fill();
+      roundRect(ctx, 680, contentTop + 130, 300, 150, 14);
       ctx.fill();
       ctx.fillStyle = '#e8a3aa';
       ctx.font = '20px system-ui, Segoe UI, sans-serif';
       ctx.fillText('ENERGY', 60, contentTop + 170);
-      ctx.fillText('POWER', 540, contentTop + 170);
+      ctx.fillText('POWER', 380, contentTop + 170);
+      ctx.fillText('COST', 700, contentTop + 170);
       ctx.fillStyle = '#ffb3bb';
-      ctx.font = 'bold 48px monospace';
+      ctx.font = 'bold 42px monospace';
       ctx.fillText(`${kwh} kWh`, 60, contentTop + 240);
-      ctx.fillText(`${kw} kW`, 540, contentTop + 240);
+      ctx.fillText(`${kw} kW`, 380, contentTop + 240);
+      ctx.fillText(costText, 700, contentTop + 240);
 
       ctx.fillStyle = '#f0d0d4';
       ctx.font = '22px system-ui, Segoe UI, sans-serif';
       ctx.fillText(`Transaction  ${c?.transactionId ?? '—'}`, 40, contentTop + 340);
       ctx.fillText(`idTag  ${c?.idTag || '—'}`, 40, contentTop + 380);
-      ctx.fillText(`SoC  ${c?.soc != null ? `${c.soc}%` : '—'}  ·  ${c?.errorCode || 'NoError'}`, 40, contentTop + 420);
+      ctx.fillText(
+        `Rate  ${sym}${Number(rate).toFixed(2)}/kWh  ·  SoC  ${c?.soc != null ? `${c.soc}%` : '—'}`,
+        40,
+        contentTop + 420
+      );
     } else {
       ctx.textAlign = 'left';
       ctx.fillStyle = '#ffb3bb';
@@ -213,7 +243,7 @@ export default function ChargerLcdScreen({
       const tiles = [
         { x: 40, label: 'ENERGY', value: `${kwh} kWh` },
         { x: 360, label: 'POWER', value: `${kw} kW` },
-        { x: 680, label: 'OUTLETS', value: String(guns.length) },
+        { x: 680, label: 'COST', value: costText },
       ];
       tiles.forEach((t) => {
         ctx.fillStyle = '#2a1218';
@@ -234,7 +264,7 @@ export default function ChargerLcdScreen({
       ctx.fillText(`FW ${fw}`, 40, contentBottom - 8);
     }
 
-    // touch nav row
+    // touch nav row — 4 equal tabs with generous hit targets
     const navY = H - 200;
     const nav = [
       { id: 'home', label: 'HOME' },
@@ -242,19 +272,22 @@ export default function ChargerLcdScreen({
       { id: 'connectors', label: 'OUTLETS' },
       { id: 'info', label: 'INFO' },
     ];
+    const navGap = 12;
+    const navPad = 28;
+    const navW = (W - navPad * 2 - navGap * (nav.length - 1)) / nav.length;
     nav.forEach((item, i) => {
-      const x = 36 + i * 240;
+      const x = navPad + i * (navW + navGap);
       const active = view === item.id;
-      drawBtn(ctx, x, navY, 220, 64, item.label, {
+      drawBtn(ctx, x, navY, navW, 68, item.label, {
         fill: active ? '#c02434' : '#9b1c2a',
         text: '#ffffff',
         active,
       });
-      zones.push({ id: `page:${item.id}`, x, y: navY, w: 220, h: 64 });
+      zones.push({ id: `page:${item.id}`, x: x - 4, y: navY - 4, w: navW + 8, h: 76 });
     });
 
     // action touch row
-    const actY = H - 112;
+    const actY = H - 110;
     const actions = [
       { id: 'plug', label: plugged ? 'UNPLUG' : 'PLUG', fill: '#6b3038', w: 168 },
       { id: 'start', label: 'START', fill: '#c02434', disabled: busy || isTx, w: 168 },
@@ -276,15 +309,24 @@ export default function ChargerLcdScreen({
         fill: disabled ? '#3f3f46' : item.fill,
         text: disabled ? '#a1a1aa' : '#ffffff',
       });
-      if (!disabled) zones.push({ id: item.id, x: ax, y: actY, w: bw, h: 72 });
+      if (!disabled) zones.push({ id: item.id, x: ax - 2, y: actY - 2, w: bw + 4, h: 76 });
       ax += bw + 12;
     });
+
+    // On OUTLETS page, each connector row is tappable to focus that outlet
+    if (view === 'connectors') {
+      guns.forEach((g, i) => {
+        const y = contentTop + 90 + i * 88;
+        if (y + 70 > contentBottom) return;
+        zones.push({ id: `outlet:${g.number}`, x: 36, y: y - 2, w: W - 72, h: 80 });
+      });
+    }
 
     hitZonesRef.current = zones;
     texture.needsUpdate = true;
   });
 
-  const onPointerDown = (e) => {
+  const handleHit = (e) => {
     e.stopPropagation();
     const uv = e.uv;
     if (!uv) return;
@@ -299,6 +341,11 @@ export default function ChargerLcdScreen({
       onPageChange?.(hit.id.slice(5));
       return;
     }
+    if (hit.id.startsWith('outlet:')) {
+      const num = Number(hit.id.slice(7));
+      if (Number.isFinite(num)) onSelectOutlet?.(num);
+      return;
+    }
     const n = connector?.number;
     if (hit.id === 'plug') onPlug?.(n, !connector?.cablePlugged);
     if (hit.id === 'start') onStart?.(n);
@@ -308,7 +355,12 @@ export default function ChargerLcdScreen({
   };
 
   return (
-    <mesh ref={meshRef} position={position} onPointerDown={onPointerDown}>
+    <mesh
+      ref={meshRef}
+      position={position}
+      onPointerDown={handleHit}
+      onClick={handleHit}
+    >
       <planeGeometry args={size} />
       <meshBasicMaterial map={texture} toneMapped={false} />
     </mesh>

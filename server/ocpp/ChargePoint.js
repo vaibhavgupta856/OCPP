@@ -20,6 +20,7 @@ import {
   transition,
 } from './fsm.js';
 import { inboundHandlers } from './handlers/index.js';
+import { SmartChargingStore } from './smartCharging.js';
 
 let nextTransactionId = 1000;
 
@@ -45,6 +46,13 @@ export class ChargePoint {
       retrieveDate: null,
       updateTimer: null,
     };
+    this.diagnostics = {
+      status: 'Idle', // Idle | Uploading | Uploaded | UploadFailed
+      location: null,
+      fileName: null,
+      uploadTimer: null,
+    };
+    this.smartCharging = new SmartChargingStore();
 
     this.onState = onState || (() => {});
     this.onMessage = onMessage || (() => {});
@@ -53,8 +61,9 @@ export class ChargePoint {
     this.config = new ConfigStore({
       NumberOfConnectors: String(this.connectorCount),
       HeartbeatInterval: String(options.heartbeatInterval ?? 60),
-      MeterValueSampleInterval: String(options.meterInterval ?? 10),
+      MeterValueSampleInterval: String(options.meterInterval ?? 2),
     });
+    this.smartCharging.configureFromConfig(this.config);
 
     this.connectors = [
       createConnectorState(0, 'ChargePoint', this.powerKw, 'Charge Point'),
@@ -113,6 +122,10 @@ export class ChargePoint {
     this.messageSeq = 0;
     this.lastError = null;
     this.bootAccepted = false;
+    // Session billing display (lab tariff — not sent as standard OCPP)
+    this.energyRatePerKwh = Number(options.energyRatePerKwh ?? 18.5);
+    this.currency = options.currency || 'INR';
+    this.currencySymbol = options.currencySymbol || '₹';
   }
 
   /* ---------- public API for UI / registry ---------- */
@@ -132,13 +145,22 @@ export class ChargePoint {
       requireSubprotocol: this.requireSubprotocol,
       identity: this.identity,
       firmwareStatus: this.firmware.status,
+      diagnosticsStatus: this.diagnostics.status,
+      diagnosticsFileName: this.diagnostics.fileName,
+      chargingProfiles: this.smartCharging.list(),
       config: this.config.snapshot(),
       localAuthListVersion: this.localAuthListVersion,
       localAuthTags: [...this.localAuthList.keys()],
       authMode: this.authMode,
       lastError: this.lastError,
+      energyRatePerKwh: this.energyRatePerKwh,
+      currency: this.currency,
+      currencySymbol: this.currencySymbol,
       connectors: this.connectors.map((c) => {
         const meter = this.meters.get(c.number)?.snapshot() || null;
+        const meterWh = meter?.meterWh ?? c.meterWh ?? 0;
+        const energyKwh = meterWh / 1000;
+        const sessionCost = Number((energyKwh * this.energyRatePerKwh).toFixed(2));
         return {
           number: c.number,
           type: c.type,
@@ -153,11 +175,17 @@ export class ChargePoint {
           reservationId: c.reservationId,
           availability: c.availability,
           powerKw: c.powerKw ?? this.powerKw,
-          meterWh: meter?.meterWh ?? c.meterWh,
+          meterWh,
           powerW: meter?.powerW ?? c.powerW,
           currentA: meter?.currentA ?? 0,
           voltageV: meter?.voltageV ?? 0,
           soc: meter?.soc ?? null,
+          energyKwh: Number(energyKwh.toFixed(3)),
+          sessionCost,
+          lastSessionCost: c.lastSessionCost ?? null,
+          lastSessionKwh: c.lastSessionKwh ?? null,
+          smartLimitW: c.smartLimitW ?? null,
+          smartLimitA: c.smartLimitA ?? null,
         };
       }),
     };
@@ -173,12 +201,35 @@ export class ChargePoint {
       event,
       data,
       cpId: this.cpId,
+      connectorId: data?.connectorId ?? null,
       ts: Date.now(),
     });
   }
 
-  log(level, text) {
-    this.onLog({ level, text, cpId: this.cpId, ts: Date.now() });
+  _inferConnectorId(text = '', payload = null) {
+    if (payload && payload.connectorId != null && payload.connectorId !== '') {
+      const n = Number(payload.connectorId);
+      if (Number.isFinite(n)) return n;
+    }
+    const raw = String(text || '');
+    const m =
+      raw.match(/\bC(\d+)\b/i) ||
+      raw.match(/\bconnector(?:Id)?\s*[:=]?\s*(\d+)\b/i) ||
+      raw.match(/\bon C(\d+)\b/i);
+    if (m) return Number(m[1]);
+    return null;
+  }
+
+  log(level, text, meta = {}) {
+    const connectorId =
+      meta.connectorId != null ? Number(meta.connectorId) : this._inferConnectorId(text);
+    this.onLog({
+      level,
+      text,
+      cpId: this.cpId,
+      connectorId: Number.isFinite(connectorId) ? connectorId : null,
+      ts: Date.now(),
+    });
   }
 
   /* ---------- connection lifecycle ---------- */
@@ -348,8 +399,9 @@ export class ChargePoint {
     }
     const call = createCall(action, payload);
     const frame = stringifyFrame(call.raw);
+    const connectorId = this._inferConnectorId('', payload);
 
-    this._trace('out', action, call.messageId, payload);
+    this._trace('out', action, call.messageId, payload, { connectorId });
 
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -359,6 +411,7 @@ export class ChargePoint {
 
       this.pending.set(call.messageId, {
         action,
+        connectorId,
         resolve: (payloadIn) => {
           clearTimeout(timer);
           resolve(payloadIn);
@@ -393,6 +446,10 @@ export class ChargePoint {
 
   _trace(direction, action, messageId, payload, extra = {}) {
     this.messageSeq += 1;
+    let connectorId = extra.connectorId;
+    if (connectorId == null) connectorId = this._inferConnectorId('', payload);
+    const n = connectorId == null || connectorId === '' ? null : Number(connectorId);
+    const resolved = Number.isFinite(n) ? n : null;
     this.onMessage({
       kind: 'ocpp',
       direction,
@@ -401,8 +458,10 @@ export class ChargePoint {
       payload,
       seq: this.messageSeq,
       cpId: this.cpId,
+      connectorId: resolved,
       ts: Date.now(),
       ...extra,
+      connectorId: resolved,
     });
   }
 
@@ -417,8 +476,14 @@ export class ChargePoint {
     }
 
     if (msg.type === MessageType.CALLRESULT) {
-      this._trace('in', `${this.pending.get(msg.messageId)?.action || '?'}.conf`, msg.messageId, msg.payload);
       const pending = this.pending.get(msg.messageId);
+      this._trace(
+        'in',
+        `${pending?.action || '?'}.conf`,
+        msg.messageId,
+        msg.payload,
+        { connectorId: pending?.connectorId ?? this._inferConnectorId('', msg.payload) }
+      );
       if (pending) {
         this.pending.delete(msg.messageId);
         pending.resolve(msg.payload);
@@ -427,12 +492,18 @@ export class ChargePoint {
     }
 
     if (msg.type === MessageType.CALLERROR) {
-      this._trace('in', 'CALLERROR', msg.messageId, {
-        errorCode: msg.errorCode,
-        errorDescription: msg.errorDescription,
-        errorDetails: msg.errorDetails,
-      });
       const pending = this.pending.get(msg.messageId);
+      this._trace(
+        'in',
+        'CALLERROR',
+        msg.messageId,
+        {
+          errorCode: msg.errorCode,
+          errorDescription: msg.errorDescription,
+          errorDetails: msg.errorDetails,
+        },
+        { connectorId: pending?.connectorId ?? null }
+      );
       if (pending) {
         this.pending.delete(msg.messageId);
         pending.reject(new Error(`${msg.errorCode}: ${msg.errorDescription}`));
@@ -452,8 +523,27 @@ export class ChargePoint {
 
     try {
       const result = await handler(this, msg.payload);
-      await this._sendResult(msg.messageId, result);
-      this._trace('out', `${msg.action}.conf`, msg.messageId, result);
+      // Optional post-conf work (e.g. TriggerMessage → BootNotification) must run
+      // AFTER CALLRESULT is on the wire, or some CMS never log the follow-up.
+      const after =
+        result && typeof result === 'object' && typeof result.__after === 'function'
+          ? result.__after
+          : null;
+      const conf =
+        after && result && typeof result === 'object'
+          ? Object.fromEntries(Object.entries(result).filter(([k]) => k !== '__after'))
+          : result;
+
+      await this._sendResult(msg.messageId, conf);
+      this._trace('out', `${msg.action}.conf`, msg.messageId, conf);
+
+      if (after) {
+        setTimeout(() => {
+          Promise.resolve()
+            .then(() => after(this))
+            .catch((err) => this.log('error', `Post-${msg.action} action failed: ${err.message}`));
+        }, 75);
+      }
     } catch (err) {
       this.log('error', `Handler ${msg.action} failed: ${err.message}`);
       await this._sendError(msg.messageId, 'InternalError', err.message);
@@ -464,12 +554,15 @@ export class ChargePoint {
   /* ---------- outbound Core messages ---------- */
 
   async sendBootNotification() {
-    const conf = await this.sendCall('BootNotification', {
+    const payload = {
       chargePointVendor: this.identity.chargePointVendor,
       chargePointModel: this.identity.chargePointModel,
       chargePointSerialNumber: this.identity.chargePointSerialNumber,
+      chargeBoxSerialNumber: this.identity.chargePointSerialNumber,
       firmwareVersion: this.identity.firmwareVersion,
-    });
+    };
+    this.log('info', 'Sending BootNotification', payload);
+    const conf = await this.sendCall('BootNotification', payload);
 
     if (conf.status === 'Accepted') {
       this.bootAccepted = true;
@@ -477,6 +570,7 @@ export class ChargePoint {
         this.config.keys.HeartbeatInterval = String(conf.interval);
       }
       this.restartHeartbeat();
+      this.log('info', `BootNotification Accepted (interval=${conf.interval ?? '—'})`);
     } else {
       this.bootAccepted = false;
       this.log('warn', `BootNotification status: ${conf.status}`);
@@ -493,9 +587,217 @@ export class ChargePoint {
     this.firmware.status = status;
     this.broadcastState();
     try {
+      // OCPP 1.6 FirmwareStatusNotification.req only carries `status`
       await this.sendCall('FirmwareStatusNotification', { status });
+      this.log('info', `FirmwareStatusNotification → ${status}`, this.getFirmwareDetails());
     } catch (err) {
       this.log('warn', `FirmwareStatusNotification failed: ${err.message}`);
+    }
+  }
+
+  async sendDiagnosticsStatusNotification(status) {
+    this.diagnostics.status = status;
+    this.broadcastState();
+    try {
+      // OCPP 1.6 DiagnosticsStatusNotification.req only carries `status`
+      await this.sendCall('DiagnosticsStatusNotification', { status });
+      this.log('info', `DiagnosticsStatusNotification → ${status}`, this.getDiagnosticsDetails());
+    } catch (err) {
+      this.log('warn', `DiagnosticsStatusNotification failed: ${err.message}`);
+    }
+  }
+
+  getFirmwareDetails() {
+    return {
+      status: this.firmware?.status || 'Idle',
+      firmwareVersion: this.identity?.firmwareVersion || null,
+      location: this.firmware?.location || null,
+      retrieveDate: this.firmware?.retrieveDate || null,
+    };
+  }
+
+  getDiagnosticsDetails() {
+    return {
+      status: this.diagnostics?.status || 'Idle',
+      fileName: this.diagnostics?.fileName || null,
+      location: this.diagnostics?.location || null,
+      startTime: this.diagnostics?.startTime || null,
+      stopTime: this.diagnostics?.stopTime || null,
+    };
+  }
+
+  /**
+   * Simulate GetDiagnostics upload to CMS-provided location (FTP/HTTP URI).
+   * Does not actually upload bytes — advances OCPP status so Massive CMS completes the job.
+   */
+  beginDiagnosticsUpload({ location, retries = 1, retryInterval = 60, startTime, stopTime } = {}) {
+    if (this.diagnostics.uploadTimer) {
+      clearTimeout(this.diagnostics.uploadTimer);
+      this.diagnostics.uploadTimer = null;
+    }
+
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const fileName = `diagnostics_${this.cpId}_${stamp}.log`;
+    this.diagnostics.location = location || null;
+    this.diagnostics.fileName = fileName;
+    this.diagnostics.startTime = startTime || null;
+    this.diagnostics.stopTime = stopTime || null;
+
+    const retryCount = Number.isFinite(Number(retries)) ? Math.max(0, Number(retries)) : 1;
+    const retrySec = Number.isFinite(Number(retryInterval)) ? Math.max(1, Number(retryInterval)) : 60;
+
+    this.log('info', `Diagnostics upload requested → ${location} as ${fileName}`);
+
+    const runAttempt = (attempt) => {
+      this.sendDiagnosticsStatusNotification('Uploading').catch(() => {});
+      // Simulated gather + upload latency
+      this.diagnostics.uploadTimer = setTimeout(() => {
+        this.diagnostics.uploadTimer = null;
+        // Always succeed in lab (CMS only needs the status machine). Retries are simulated once if forced.
+        const failOnce = false;
+        if (failOnce && attempt < retryCount) {
+          this.sendDiagnosticsStatusNotification('UploadFailed').catch(() => {});
+          this.diagnostics.uploadTimer = setTimeout(() => runAttempt(attempt + 1), retrySec * 1000);
+          return;
+        }
+        this.sendDiagnosticsStatusNotification('Uploaded').catch(() => {});
+        this.diagnostics.uploadTimer = setTimeout(() => {
+          this.diagnostics.uploadTimer = null;
+          this.sendDiagnosticsStatusNotification('Idle').catch(() => {});
+        }, 1500);
+      }, 1800 + Math.min(attempt, 2) * 400);
+    };
+
+    setImmediate(() => runAttempt(0));
+    return { fileName };
+  }
+
+  setChargingProfile(connectorId, csChargingProfiles) {
+    this.smartCharging.configureFromConfig(this.config);
+    const connector = this.getConnector(connectorId);
+    if (connectorId !== 0 && !connector) {
+      return { status: 'Rejected' };
+    }
+
+    const status = this.smartCharging.setProfile(connectorId, csChargingProfiles, {
+      hasTransaction: !!(connector && connector.transactionId),
+      transactionId: connector?.transactionId ?? null,
+    });
+
+    if (status === 'Accepted') {
+      this.log(
+        'info',
+        `SetChargingProfile Accepted id=${csChargingProfiles?.chargingProfileId} purpose=${csChargingProfiles?.chargingProfilePurpose} connector=${connectorId}`
+      );
+      this.applySmartChargingLimits();
+      this.broadcastState();
+      this.emitUi('charging_profile', {
+        action: 'set',
+        connectorId,
+        profileId: csChargingProfiles?.chargingProfileId,
+      });
+    }
+    return { status };
+  }
+
+  clearChargingProfile(filters = {}) {
+    const status = this.smartCharging.clearProfiles(filters);
+    if (status === 'Accepted') {
+      this.log('info', `ClearChargingProfile Accepted`, filters);
+      this.applySmartChargingLimits();
+      this.broadcastState();
+      this.emitUi('charging_profile', { action: 'clear', ...filters });
+    }
+    return { status };
+  }
+
+  getCompositeSchedule(connectorId, duration, chargingRateUnit) {
+    const connector =
+      connectorId === 0 ? this.getConnector(1) : this.getConnector(connectorId);
+    if (connectorId !== 0 && !this.getConnector(connectorId)) {
+      return { status: 'Rejected' };
+    }
+
+    const target = this.getConnector(connectorId === 0 ? 0 : connectorId);
+    const sample = connector || this.connectors.find((c) => c.number > 0);
+    const meter = sample ? this.meters.get(sample.number) : null;
+    const voltageV = meter?.voltageV || (sample?.powerKw >= 50 ? 400 : 230);
+    const ratedKw =
+      connectorId === 0
+        ? this.powerKw
+        : target?.powerKw ?? sample?.powerKw ?? this.powerKw;
+
+    const schedule = this.smartCharging.buildCompositeSchedule({
+      connectorId: connectorId === 0 ? 0 : connectorId,
+      duration,
+      chargingRateUnit: chargingRateUnit || 'W',
+      connectorRatedKw: ratedKw,
+      voltageV,
+      transactionId: sample?.transactionId ?? null,
+      transactionStartMs: sample?.transactionStartMs ?? null,
+    });
+
+    return {
+      status: 'Accepted',
+      connectorId,
+      scheduleStart: schedule.startSchedule,
+      chargingSchedule: schedule,
+    };
+  }
+
+  /**
+   * Apply active smart-charging limits to meters / SuspendedEVSE when limit is 0.
+   */
+  applySmartChargingLimits(onlyConnectorId = null) {
+    const nowMs = Date.now();
+    for (const c of this.connectors) {
+      if (c.number === 0) continue;
+      if (onlyConnectorId != null && c.number !== onlyConnectorId) continue;
+      const meter = this.meters.get(c.number);
+      if (!meter) continue;
+
+      const voltageV = meter.voltageV || (c.powerKw >= 50 ? 400 : 230);
+      const eff = this.smartCharging.getEffectiveLimit({
+        connectorId: c.number,
+        connectorRatedKw: c.powerKw ?? this.powerKw,
+        voltageV,
+        transactionId: c.transactionId,
+        transactionStartMs: c.transactionStartMs ?? null,
+        nowMs,
+      });
+
+      c.smartLimitW = Math.round(eff.limitW);
+      c.smartLimitA = Math.round(eff.limitA * 10) / 10;
+
+      const limitKw = Math.max(0, eff.limitW / 1000);
+      meter.setMaxPowerKw(limitKw > 0 ? limitKw : 0);
+
+      if (!c.transactionId) {
+        c.smartChargingSuspended = false;
+        continue;
+      }
+
+      if (eff.limitW <= 0.5) {
+        if (c.status === ConnectorStatus.Charging || c.status === ConnectorStatus.SuspendedEV) {
+          const prev = c.status;
+          transition(c, ConnectorStatus.SuspendedEVSE, { force: true });
+          meter.pause();
+          c.smartChargingSuspended = true;
+          if (prev !== ConnectorStatus.SuspendedEVSE && this.connectionState === 'online') {
+            this.sendStatusNotification(c.number).catch(() => {});
+          }
+        } else if (c.status === ConnectorStatus.SuspendedEVSE) {
+          meter.pause();
+          c.smartChargingSuspended = true;
+        }
+      } else if (c.smartChargingSuspended && c.status === ConnectorStatus.SuspendedEVSE) {
+        transition(c, ConnectorStatus.Charging, { force: true });
+        meter.start();
+        c.smartChargingSuspended = false;
+        if (this.connectionState === 'online') {
+          this.sendStatusNotification(c.number).catch(() => {});
+        }
+      }
     }
   }
 
@@ -600,10 +902,15 @@ export class ChargePoint {
 
   restartHeartbeat() {
     this._stopHeartbeat();
-    const sec = Math.max(5, this.config.getNumber('HeartbeatInterval', 60));
-    this.heartbeatTimer = setInterval(() => {
+    // OCPP allows small intervals; Massive / lab often want 1s for visibility.
+    const sec = Math.max(1, this.config.getNumber('HeartbeatInterval', 60));
+    this.log('info', `Heartbeat every ${sec}s`);
+    const beat = () => {
       this.sendHeartbeat().catch((err) => this.log('warn', `Heartbeat: ${err.message}`));
-    }, sec * 1000);
+    };
+    // Immediate beat so ChangeConfiguration / Boot shows up in the UI right away
+    beat();
+    this.heartbeatTimer = setInterval(beat, sec * 1000);
   }
 
   _stopHeartbeat() {
@@ -731,9 +1038,14 @@ export class ChargePoint {
       return this.config.getBool('AllowOfflineTxForUnknownId', false) ? 'Accepted' : 'Invalid';
     }
 
+    // local_or_csms: local whitelist wins (demo tags) — do not call CMS Authorize here
+    // (calling CMS mid-handler can race with RemoteStart.conf / pending calls)
+    if (mode === 'local_or_csms' && localStatus === 'Accepted') {
+      return 'Accepted';
+    }
+
     let remoteStatus = null;
     if (this.connectionState === 'online') {
-      // Prefer fresh CMS answer over a cached Invalid from an earlier attempt
       const cached = this.authCache.get(idTag);
       if (cached === 'Accepted' && mode === 'csms') {
         return 'Accepted';
@@ -744,7 +1056,6 @@ export class ChargePoint {
         if (this.config.getBool('AuthorizationCacheEnabled', true) && remoteStatus === 'Accepted') {
           this.authCache.set(idTag, remoteStatus);
         } else if (remoteStatus !== 'Accepted') {
-          // Do not permanently cache Invalid — operator may switch tags / mode
           this.authCache.delete(idTag);
         }
       } catch (err) {
@@ -756,7 +1067,6 @@ export class ChargePoint {
         throw err;
       }
     } else {
-      // Offline
       if (localStatus === 'Accepted') return 'Accepted';
       if (this.config.getBool('AllowOfflineTxForUnknownId', false)) return 'Accepted';
       return 'Invalid';
@@ -813,22 +1123,53 @@ export class ChargePoint {
     if (connector.status === ConnectorStatus.Faulted) throw new Error('Connector faulted');
     if (connector.transactionId) throw new Error('Transaction already active');
 
-    let tag = this.resolveIdTagForStart(connectorId, idTag);
-    if (tag !== idTag) {
+    // RemoteStart must keep the exact CMS idTag — swapping breaks Massive's session pairing
+    let tag =
+      reason === 'Remote'
+        ? String(idTag || '').trim() || 'CARD-7F2A91'
+        : this.resolveIdTagForStart(connectorId, idTag);
+    if (tag !== idTag && reason !== 'Remote') {
       this.log(
         'warn',
-        `idTag "${idTag}" already in use on another connector — using "${tag}" for C${connectorId}`
+        `idTag "${idTag}" already in use on another connector — using "${tag}" for C${connectorId}`,
+        { connectorId }
       );
+    }
+    if (reason === 'Remote' && !this.localAuthList.has(tag)) {
+      this.localAuthList.set(tag, { status: 'Accepted' });
     }
 
     if (connector.reservationId && connector.reservedIdTag && connector.reservedIdTag !== tag) {
       throw new Error('Reserved for another idTag');
     }
 
+    const resetIfPreparing = async () => {
+      if (connector.transactionId) return;
+      if (connector.status === ConnectorStatus.Preparing) {
+        transition(
+          connector,
+          connector.availability === 'Inoperative'
+            ? ConnectorStatus.Unavailable
+            : ConnectorStatus.Available,
+          { force: true }
+        );
+        if (this.connectionState === 'online') {
+          await this.sendStatusNotification(connector.number).catch(() => {});
+        }
+        this.broadcastState();
+      }
+    };
+
     const tryStartWithTag = async (candidate) => {
-      const auth = await this.authorizeIdTag(candidate);
-      if (auth !== 'Accepted') {
-        return { ok: false, stage: 'Authorize', status: auth, tag: candidate };
+      // RemoteStart: CSMS already chose this idTag — do not round-trip Authorize
+      // (Massive returns Invalid for demo tags and left the UI on Available).
+      if (reason !== 'Remote') {
+        const auth = await this.authorizeIdTag(candidate);
+        if (auth !== 'Accepted') {
+          return { ok: false, stage: 'Authorize', status: auth, tag: candidate };
+        }
+      } else {
+        this.log('info', `RemoteStart: skipping Authorize for "${candidate}"`, { connectorId });
       }
 
       if (!connector.cablePlugged) {
@@ -836,69 +1177,131 @@ export class ChargePoint {
       }
 
       transition(connector, ConnectorStatus.Preparing, { force: true });
-      await this.sendStatusNotification(connector.number);
+      this.broadcastState();
+      // Don't block session start on StatusNotification.conf (CMS can be slow)
+      this.sendStatusNotification(connector.number).catch((err) =>
+        this.log('warn', `Preparing StatusNotification: ${err.message}`, { connectorId })
+      );
 
       const meter = this.meters.get(connectorId);
+      if (!meter) throw new Error(`No meter for connector ${connectorId}`);
       meter.resetSession({ keepMeter: false });
       const meterStart = meter.snapshot().meterWh;
 
-      const conf = await this.sendCall('StartTransaction', {
-        connectorId,
-        idTag: candidate,
-        meterStart,
-        timestamp: utcNowIso(),
-        reservationId: connector.reservationId || undefined,
-      });
+      const mode = this.authMode || 'local_or_csms';
+      const localOk = this.localAuthList.get(candidate)?.status === 'Accepted';
+      // Remote: always allow lab continue — CSMS asked us to start
+      const mayLabContinue = reason === 'Remote' || ((mode === 'local' || mode === 'local_or_csms') && localOk);
+
+      let conf;
+      try {
+        conf = await this.sendCall(
+          'StartTransaction',
+          {
+            connectorId,
+            idTag: candidate,
+            meterStart,
+            timestamp: utcNowIso(),
+            reservationId: connector.reservationId || undefined,
+          },
+          { timeoutMs: 15000 }
+        );
+      } catch (err) {
+        if (mayLabContinue) {
+          this.log(
+            'warn',
+            `StartTransaction no conf (${err.message}) — starting locally for "${candidate}"`,
+            { connectorId }
+          );
+          return {
+            ok: true,
+            conf: {
+              transactionId: nextTransactionId++,
+              idTagInfo: { status: 'Accepted' },
+            },
+            tag: candidate,
+            meter,
+            labOverride: true,
+          };
+        }
+        await resetIfPreparing();
+        throw err;
+      }
 
       const st = conf.idTagInfo?.status;
       if (st && st !== 'Accepted') {
-        transition(connector, ConnectorStatus.Available, { force: true });
-        await this.sendStatusNotification(connector.number);
-        this.broadcastState();
+        if (mayLabContinue) {
+          this.log(
+            'warn',
+            `CMS StartTransaction idTag ${st} for "${candidate}" — continuing session anyway (${reason}/${mode})`,
+            { connectorId }
+          );
+          return {
+            ok: true,
+            conf: {
+              ...conf,
+              transactionId: conf.transactionId ?? nextTransactionId++,
+            },
+            tag: candidate,
+            meter,
+            labOverride: true,
+          };
+        }
+        await resetIfPreparing();
         return { ok: false, stage: 'StartTransaction', status: st, tag: candidate, conf };
       }
 
       return { ok: true, conf, tag: candidate, meter };
     };
 
-    let result = await tryStartWithTag(tag);
+    let result;
+    try {
+      result = await tryStartWithTag(tag);
 
-    // CMS often returns Blocked / ConcurrentTx when the same RFID is already charging elsewhere.
-    // Retry once with other free local tags.
-    if (
-      !result.ok &&
-      result.stage === 'StartTransaction' &&
-      (result.status === 'Blocked' || result.status === 'ConcurrentTx')
-    ) {
-      const inUse = this._tagsInUse(connectorId);
-      inUse.add(result.tag);
-      for (const alt of this.localAuthList.keys()) {
-        if (inUse.has(alt)) continue;
-        this.log('info', `Retry StartTransaction on C${connectorId} with alternate idTag "${alt}"`);
-        result = await tryStartWithTag(alt);
-        if (result.ok) break;
-        if (
-          result.stage === 'StartTransaction' &&
-          (result.status === 'Blocked' || result.status === 'ConcurrentTx')
-        ) {
-          inUse.add(result.tag);
-          continue;
+      // CMS often returns Blocked / ConcurrentTx when the same RFID is already charging elsewhere.
+      // Retry once with other free local tags (local starts only — never swap RemoteStart tag).
+      if (
+        reason !== 'Remote' &&
+        !result.ok &&
+        result.stage === 'StartTransaction' &&
+        (result.status === 'Blocked' || result.status === 'ConcurrentTx')
+      ) {
+        const inUse = this._tagsInUse(connectorId);
+        inUse.add(result.tag);
+        for (const alt of this.localAuthList.keys()) {
+          if (inUse.has(alt)) continue;
+          this.log('info', `Retry StartTransaction on C${connectorId} with alternate idTag "${alt}"`, {
+            connectorId,
+          });
+          result = await tryStartWithTag(alt);
+          if (result.ok) break;
+          if (
+            result.stage === 'StartTransaction' &&
+            (result.status === 'Blocked' || result.status === 'ConcurrentTx')
+          ) {
+            inUse.add(result.tag);
+            continue;
+          }
+          break;
         }
-        break;
       }
-    }
 
-    if (!result.ok) {
-      if (result.stage === 'Authorize') {
-        throw new Error(
-          `Authorize ${result.status} for idTag "${result.tag}". Use a CMS-registered RFID, or set Auth mode to Local / Local or CMS.`
-        );
+      if (!result.ok) {
+        await resetIfPreparing();
+        if (result.stage === 'Authorize') {
+          throw new Error(
+            `Authorize ${result.status} for idTag "${result.tag}". Use a CMS-registered RFID, or set Auth mode to Local / Local or CMS.`
+          );
+        }
+        const hint =
+          result.status === 'Blocked' || result.status === 'ConcurrentTx'
+            ? ` CMS rejected concurrent use of the same RFID. Use a different CMS-registered idTag for each connector (examples: ${[...this.localAuthList.keys()].slice(0, 3).join(', ')}).`
+            : '';
+        throw new Error(`StartTransaction idTag ${result.status} for "${result.tag}".${hint}`);
       }
-      const hint =
-        result.status === 'Blocked' || result.status === 'ConcurrentTx'
-          ? ` CMS rejected concurrent use of the same RFID. Use a different CMS-registered idTag for each connector (examples: ${[...this.localAuthList.keys()].slice(0, 3).join(', ')}).`
-          : '';
-      throw new Error(`StartTransaction idTag ${result.status} for "${result.tag}".${hint}`);
+    } catch (err) {
+      await resetIfPreparing();
+      throw err;
     }
 
     const { conf, meter } = result;
@@ -907,6 +1310,8 @@ export class ChargePoint {
     connector.transactionId = conf.transactionId ?? nextTransactionId++;
     connector.idTag = tag;
     connector.locked = true;
+    connector.transactionStartMs = Date.now();
+    connector.smartChargingSuspended = false;
     if (connector.reservationId) {
       const t = this.reservationTimers.get(connector.reservationId);
       if (t) clearTimeout(t);
@@ -918,10 +1323,17 @@ export class ChargePoint {
     transition(connector, ConnectorStatus.Charging, { force: true });
     await this.sendStatusNotification(connector.number);
 
-    meter.start();
+    this.applySmartChargingLimits();
+    if (connector.status === ConnectorStatus.Charging) {
+      meter.start();
+    }
     this._startMeterLoop(connectorId);
 
-    this.log('info', `Tx ${connector.transactionId} started on C${connectorId} with ${tag} (${reason})`);
+    this.log(
+      'info',
+      `Tx ${connector.transactionId} started on C${connectorId} with ${tag} (${reason}${result.labOverride ? ', labOverride' : ''})`,
+      { connectorId }
+    );
     this.broadcastState();
     return connector.transactionId;
   }
@@ -953,8 +1365,18 @@ export class ChargePoint {
       ],
     });
 
+    this.smartCharging.clearTxProfilesForTransaction(txId);
+    this.smartCharging.clearTxProfilesForConnector(connectorId);
+
     connector.transactionId = null;
     connector.idTag = null;
+    connector.transactionStartMs = null;
+    connector.smartChargingSuspended = false;
+    connector.smartLimitW = null;
+    connector.smartLimitA = null;
+
+    // Restore rated power cap after TxProfile cleared
+    meter.setMaxPowerKw(connector.powerKw ?? this.powerKw);
     connector.locked = false;
     connector.meterWh = snap.meterWh;
 
@@ -975,15 +1397,34 @@ export class ChargePoint {
     }
     await this.sendStatusNotification(connector.number);
 
-    this.log('info', `Tx ${txId} stopped (${reason}) → ${connector.status}`);
+    this.log('info', `Tx ${txId} stopped on C${connector.number} (${reason}) → ${connector.status}`, {
+      connectorId: connector.number,
+    });
+    const kwh = (snap.meterWh || 0) / 1000;
+    connector.lastSessionKwh = Number(kwh.toFixed(3));
+    connector.lastSessionCost = Number((kwh * this.energyRatePerKwh).toFixed(2));
     this.broadcastState();
   }
 
-  async sendMeterValues(connectorId) {
+  setTariff({ energyRatePerKwh, currency, currencySymbol } = {}) {
+    if (energyRatePerKwh != null && Number.isFinite(Number(energyRatePerKwh))) {
+      this.energyRatePerKwh = Math.max(0, Number(energyRatePerKwh));
+    }
+    if (currency) this.currency = String(currency).slice(0, 8).toUpperCase();
+    if (currencySymbol) this.currencySymbol = String(currencySymbol).slice(0, 4);
+    this.broadcastState();
+    return {
+      energyRatePerKwh: this.energyRatePerKwh,
+      currency: this.currency,
+      currencySymbol: this.currencySymbol,
+    };
+  }
+
+  async sendMeterValues(connectorId, { alreadyTicked = false } = {}) {
     const connector = this.getConnector(connectorId);
     const meter = this.meters.get(connectorId);
     if (!connector || !meter) return null;
-    meter.tick();
+    if (!alreadyTicked) meter.tick();
     const snap = meter.snapshot();
     connector.meterWh = snap.meterWh;
     connector.powerW = snap.powerW;
@@ -1004,19 +1445,44 @@ export class ChargePoint {
     return conf;
   }
 
+  /**
+   * Fast UI sim tick (~400ms) + OCPP MeterValues on MeterValueSampleInterval.
+   * Keeps energy/power/cost live in the console without flooding the CMS.
+   */
   _startMeterLoop(connectorId) {
     this._stopMeterLoop(connectorId);
-    const sec = Math.max(1, this.config.getNumber('MeterValueSampleInterval', 10));
+    const ocppSec = Math.max(1, this.config.getNumber('MeterValueSampleInterval', 2));
+    const uiMs = 400;
+    let sinceOcppMs = 0;
+
     const timer = setInterval(() => {
       const c = this.getConnector(connectorId);
       if (!c?.transactionId) {
         this._stopMeterLoop(connectorId);
         return;
       }
-      this.sendMeterValues(connectorId).catch((err) =>
-        this.log('warn', `MeterValues: ${err.message}`)
-      );
-    }, sec * 1000);
+
+      const meter = this.meters.get(connectorId);
+      if (meter) {
+        this.applySmartChargingLimits(connectorId);
+        if (c.status === ConnectorStatus.Charging) {
+          meter.tick();
+        }
+        const snap = meter.snapshot();
+        c.meterWh = snap.meterWh;
+        c.powerW = snap.powerW;
+        this.broadcastState();
+      }
+
+      sinceOcppMs += uiMs;
+      if (sinceOcppMs >= ocppSec * 1000) {
+        sinceOcppMs = 0;
+        this.sendMeterValues(connectorId, { alreadyTicked: true }).catch((err) =>
+          this.log('warn', `MeterValues: ${err.message}`, { connectorId })
+        );
+      }
+    }, uiMs);
+
     this.meterTimers.set(connectorId, timer);
   }
 

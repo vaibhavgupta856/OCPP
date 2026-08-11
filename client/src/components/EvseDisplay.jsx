@@ -13,6 +13,8 @@ export default function EvseDisplay({
   const kwh = ((connector.meterWh || 0) / 1000).toFixed(3);
   const kw = ((connector.powerW || 0) / 1000).toFixed(2);
   const isTx = !!connector.transactionId;
+  const sym = charger.currencySymbol || '₹';
+  const cost = Number(connector.sessionCost ?? 0).toFixed(2);
 
   return (
     <div className="evse-lcd">
@@ -34,6 +36,13 @@ export default function EvseDisplay({
           <small>kW</small>
         </div>
         <div>
+          <small>COST</small>
+          <strong className="lcd-digits">
+            {sym}
+            {cost}
+          </strong>
+        </div>
+        <div>
           <small>TX</small>
           <strong className="lcd-digits">{connector.transactionId ?? '—'}</strong>
         </div>
@@ -42,6 +51,13 @@ export default function EvseDisplay({
           <strong className="lcd-digits">
             {connector.soc !== null && connector.soc !== undefined ? `${connector.soc}%` : '—'}
           </strong>
+        </div>
+        <div>
+          <small>LIMIT</small>
+          <strong className="lcd-digits">
+            {connector.smartLimitW != null ? (connector.smartLimitW / 1000).toFixed(1) : '—'}
+          </strong>
+          <small>kW</small>
         </div>
       </div>
 

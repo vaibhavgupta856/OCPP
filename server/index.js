@@ -57,6 +57,9 @@ app.post('/api/chargers', async (req, res) => {
       heartbeatInterval,
       initialSoc,
       batteryKwh,
+      energyRatePerKwh,
+      currency,
+      currencySymbol,
     } = req.body || {};
 
     if (!cpId || !baseUrl) {
@@ -86,6 +89,9 @@ app.post('/api/chargers', async (req, res) => {
       heartbeatInterval,
       initialSoc,
       batteryKwh,
+      energyRatePerKwh,
+      currency,
+      currencySymbol,
     });
 
     res.status(201).json({ charger: state });
@@ -174,6 +180,16 @@ app.post('/api/chargers/:cpId/power', (req, res) =>
       cp.updatePower(Number(req.body.powerKw));
     }
   })
+);
+
+app.post('/api/chargers/:cpId/tariff', (req, res) =>
+  withCp(req, res, (cp) =>
+    cp.setTariff({
+      energyRatePerKwh: req.body.energyRatePerKwh,
+      currency: req.body.currency,
+      currencySymbol: req.body.currencySymbol,
+    })
+  )
 );
 
 app.post('/api/chargers/:cpId/soc', (req, res) =>
