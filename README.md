@@ -35,6 +35,16 @@ npm run dev
 3. Commission / connect.
 4. For local demo tags (`CARD-7F2A91`, …) keep Auth mode **Local or CMS**. For production-like tests use a CSMS-registered idTag and **CMS only**.
 
+## Live website (Render)
+
+One-click deploy (free Web Service):
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/vaibhavgupta856/OCPP)
+
+Or in the [Render Dashboard](https://dashboard.render.com/): **New → Blueprint** → select `vaibhavgupta856/OCPP` (uses `render.yaml`).
+
+After deploy, open `https://<service>.onrender.com`. Free instances sleep when idle (first load can take ~1 min).
+
 ## Docs
 
 - `docs/OCPP-1.6-Guide.md` — short OCPP 1.6 overview
