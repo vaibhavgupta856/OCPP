@@ -80,7 +80,7 @@ export default function ConnectionDock({
             <input
               value={form.cpId}
               onChange={(e) => setForm({ ...form, cpId: e.target.value })}
-              placeholder="EVSE-LAB-001"
+              placeholder="MASSIVE-CP-001"
               required
             />
           </label>

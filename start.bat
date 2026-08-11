@@ -1,5 +1,5 @@
 @echo off
-REM Pier Charge Point Lab launcher
+REM Massive Mobility Charging Simulator launcher
 set "PATH=C:\Program Files\nodejs;%PATH%"
 cd /d "%~dp0"
 
@@ -16,7 +16,7 @@ if not exist "node_modules\" (
   call npm run install:all
 )
 
-echo Starting Pier lab...
+echo Starting Massive Mobility Charging Simulator...
 echo   UI:  http://localhost:5173
 echo   API: http://localhost:8787
 call npm run dev

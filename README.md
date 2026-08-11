@@ -1,65 +1,58 @@
-# Pier — OCPP 1.6 Charge Point Lab
+# Massive Mobility Charging Simulator — OCPP 1.6
 
-Browser console for a **Charge Point / EVSE** that speaks OCPP 1.6 JSON over WebSocket to any CSMS. Built as a standalone Node + React project.
+Charge Point (EVSE) simulator that speaks OCPP 1.6 JSON over WebSocket to your CSMS (e.g. Massive Charging).
 
-## What it does
+Default BootNotification identity: **Massive Mobility** / **Massive-CP-Sim-16** / firmware **Massive-CPS-16.3.2.1**.
 
-- Full Core Charge Point client: Boot, Heartbeat, Status, Authorize, Start/Stop, MeterValues
-- RemoteStart/Stop, Reset, Unlock, ChangeAvailability, Config, TriggerMessage, LocalList, DataTransfer, Reserve
-- Per-outlet state machine and metering
-- Interactive Pier cabinet UI (touch screen, soft-keys, RFID pad, multi-outlet)
-- Auth modes: CSMS-only, local list, or local-or-CSMS
-- Optional `ocpp1.6` subprotocol + Basic Auth
+## Features
 
-## Run
+- Boot, Heartbeat, StatusNotification, Authorize, Start/StopTransaction, MeterValues
+- Remote start/stop, Reset, Unlock, ChangeAvailability, Get/ChangeConfiguration, TriggerMessage, ClearCache, LocalList, DataTransfer, ReserveNow/CancelReservation
+- Interactive Massive cabinet UI (touch screen, soft-keys, RFID pad, multi-outlet)
+- Multi-connector (1–4) with per-outlet power (kW)
+- Auth modes: Local or CMS, Local only, CMS only
+
+## Quick start
 
 ```powershell
-cd evse-ocpp16-console
 .\start.ps1
 ```
 
 Or:
 
 ```powershell
-$env:PATH = "C:\Program Files\nodejs;" + $env:PATH
 npm run install:all
 npm run dev
 ```
 
-- UI: http://localhost:5173
-- API: http://localhost:8787
+- UI: http://localhost:5173  
+- API: http://localhost:8787  
 
-## Connect to a CSMS
+## Connect to CSMS
 
-1. Paste your CSMS WebSocket **base** URL (Pier appends `/{chargePointId}`).
-2. Enter a charge point ID that exists on that CSMS.
-3. Prefer **Require ocpp1.6 subprotocol**; if handshake fails, reconnect without it from Bench controls.
+1. Paste your CSMS WebSocket **base** URL (simulator appends `/{chargePointId}`).
+2. Choose a charge point id and connector count.
+3. Commission / connect.
 4. For local demo tags (`CARD-7F2A91`, …) keep Auth mode **Local or CMS**. For production-like tests use a CSMS-registered idTag and **CMS only**.
-
-```bash
-npm run smoke
-node scripts/probe-cms.mjs wss://your-csms.example/ocpp/1.6 YOUR-CP-ID
-```
 
 ## Docs
 
-- `docs/Pier-Simulator-Guide.docx` — how Pier works and how parts connect
-- `docs/OCPP-1.6-Guide.docx` — short OCPP 1.6 overview
+- `docs/OCPP-1.6-Guide.md` — short OCPP 1.6 overview
+- `docs/Massive-Mobility-Simulator-Guide.md` / `.docx` — how the simulator works and how parts connect
+- `docs/Tech-Stack-Flow-Guide.md` / `.docx` — every technology in flow order and how they depend on each other
 
 ## Layout
 
 ```
-evse-ocpp16-console/
-  server/     Express + Socket.IO + OCPP Charge Point
-  client/     Vite + React Pier console
-  scripts/    Local smoke + CSMS probe
-  docs/       Guides (Word + Markdown)
+  server/     Node Express + Socket.IO + OCPP WebSocket client
+  client/     Vite + React console
+  docs/       Guides
 ```
 
-## Connection model
+## Architecture
 
 ```
-Browser (UI) --REST/Socket.IO--> Pier backend --OCPP WebSocket--> CMS
+Browser (UI) --REST/Socket.IO--> Simulator backend --OCPP WebSocket--> CMS
 ```
 
-The browser never opens the OCPP socket; only the Pier Node process does.
+The browser never opens the OCPP socket; only the Node process does.

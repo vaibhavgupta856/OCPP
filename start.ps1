@@ -1,25 +1,26 @@
-# Pier Charge Point Lab launcher (PowerShell)
+# Massive Mobility Charging Simulator launcher (PowerShell)
+$ErrorActionPreference = 'Stop'
+$root = Split-Path -Parent $MyInvocation.MyCommand.Path
+Set-Location $root
 
 $nodeDir = 'C:\Program Files\nodejs'
-if (-not (Test-Path (Join-Path $nodeDir 'npm.cmd'))) {
-  Write-Error "Node.js not found in $nodeDir. Install from https://nodejs.org"
+if (Test-Path "$nodeDir\node.exe") {
+  $env:Path = "$nodeDir;$env:Path"
+}
+
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+  Write-Host 'Node.js not found. Install Node LTS, then re-run.' -ForegroundColor Red
   exit 1
 }
 
-$env:PATH = "$nodeDir;$env:PATH"
-Set-Location $PSScriptRoot
-
-Write-Host "Node $(node -v) / npm $(npm -v)" -ForegroundColor Cyan
-
-if (-not (Test-Path '.\node_modules')) {
-  Write-Host 'Installing dependencies...' -ForegroundColor Yellow
-  npm run install:all
-  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+if (-not (Test-Path 'node_modules')) {
+  Write-Host 'Installing root dependencies...' -ForegroundColor Yellow
+  npm install
+}
+if (-not (Test-Path 'client\node_modules')) {
+  Write-Host 'Installing client dependencies...' -ForegroundColor Yellow
+  npm install --prefix client
 }
 
-Write-Host ''
-Write-Host 'Starting Pier lab...' -ForegroundColor Green
-Write-Host '  UI:  http://localhost:5173'
-Write-Host '  API: http://localhost:8787'
-Write-Host ''
+Write-Host 'Starting Massive Mobility Charging Simulator...' -ForegroundColor Green
 npm run dev

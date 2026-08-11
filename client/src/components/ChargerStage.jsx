@@ -90,6 +90,12 @@ export default function ChargerStage({
     <div className={`charger-stage roomy ${reconnecting ? 'is-reconnecting' : ''}`}>
       <div className="stage-toolbar">
         <p className="stage-hint">{hint}</p>
+        <span className="meta-pill" title="Charge point firmware">
+          FW {charger.identity?.firmwareVersion || 'Massive-CPS-16.3.2.1'}
+          {charger.firmwareStatus && charger.firmwareStatus !== 'Idle'
+            ? ` · ${charger.firmwareStatus}`
+            : ''}
+        </span>
         <div className="multi-chips">
           {guns.map((c) => {
             const on = selected.includes(c.number);
@@ -119,6 +125,8 @@ export default function ChargerStage({
           online={charger.connectionState === 'online'}
           connectionState={charger.connectionState}
           cpId={charger.cpId}
+          identity={charger.identity}
+          firmwareStatus={charger.firmwareStatus}
           busy={busy}
           onSelectOutlet={(n) => {
             onSelectConnector(n);

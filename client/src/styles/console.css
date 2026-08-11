@@ -8,10 +8,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 1.5rem;
+  padding: 0.9rem 1.5rem;
   border-bottom: 1px solid var(--steel);
-  background: rgba(20, 26, 31, 0.85);
-  backdrop-filter: blur(10px);
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
   position: sticky;
   top: 0;
   z-index: 20;
@@ -23,58 +23,92 @@
   align-items: center;
 }
 
+/* Massive “M” mark — three rounded bars */
 .brand-mark {
-  width: 42px;
-  height: 42px;
-  border-radius: 6px;
-  background:
-    linear-gradient(135deg, var(--cyan) 0%, transparent 55%),
-    linear-gradient(315deg, var(--amber) 0%, var(--steel) 60%);
-  box-shadow: var(--glow-cyan);
+  width: 34px;
+  height: 34px;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  align-items: end;
+  padding: 2px 0;
+}
+.brand-mark::before,
+.brand-mark::after {
+  content: '';
+  display: block;
+  background: var(--brand);
+  border-radius: 999px;
+}
+.brand-mark::before {
+  height: 55%;
+}
+.brand-mark::after {
+  height: 100%;
+}
+.brand-mark span {
+  display: block;
+  height: 78%;
+  background: var(--brand);
+  border-radius: 999px;
+  align-self: end;
 }
 
 .brand-name {
   margin: 0;
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 1.65rem;
-  letter-spacing: 0.02em;
-  line-height: 1;
+  font-size: 1.35rem;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: var(--text);
 }
 
 .brand-sub {
   margin: 0.2rem 0 0;
   color: var(--text-dim);
   font-size: 0.72rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  font-weight: 500;
 }
 
 .top-meta {
   display: flex;
   gap: 0.5rem;
+  align-items: center;
 }
 
 .meta-pill {
-  border: 1px solid var(--steel-bright);
-  border-radius: 999px;
-  padding: 0.25rem 0.7rem;
+  border: 1px solid var(--steel);
+  border-radius: var(--radius-pill);
+  padding: 0.3rem 0.75rem;
   font-size: 0.72rem;
   color: var(--text-dim);
-  text-transform: uppercase;
+  text-transform: none;
+  background: var(--bg-panel);
+  font-weight: 600;
 }
 
 .meta-pill.link-online {
-  color: var(--signal-green);
-  border-color: var(--cyan-dim);
+  color: #047857;
+  border-color: #a7f3d0;
+  background: #ecfdf5;
 }
 .meta-pill.link-connecting,
 .meta-pill.link-reconnecting {
-  color: var(--amber);
+  color: var(--brand-deep);
+  border-color: var(--brand-muted);
+  background: var(--brand-soft);
   animation: reconnect-glow 1.6s ease-in-out infinite;
 }
 .meta-pill.link-offline {
-  color: var(--signal-red);
+  color: var(--brand);
+  border-color: var(--brand-muted);
+  background: var(--brand-soft);
 }
 
 .console-body {
@@ -113,13 +147,13 @@
   width: 100%;
   flex: 1;
   height: auto;
-  min-height: min(58vh, 620px);
+  min-height: min(68vh, 740px);
   border-radius: 16px;
 }
 .yard-loading {
   display: grid;
   place-items: center;
-  background: linear-gradient(180deg, #87b7d9 0%, #c5d8e8 55%, #3f6b3f 100%);
+  background: linear-gradient(180deg, #f8f9fb 0%, #fbeaea 55%, #e5e7eb 100%);
 }
 .yard-loading-card {
   display: flex;
@@ -128,16 +162,18 @@
   gap: 0.75rem;
   padding: 1.25rem 1.5rem;
   border-radius: 12px;
-  background: rgba(10, 28, 22, 0.72);
-  color: #e8f5ef;
+  background: #ffffff;
+  border: 1px solid var(--steel);
+  box-shadow: var(--shadow-card);
+  color: var(--text);
   font-size: 0.85rem;
 }
 .yard-loading-spinner {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  border: 3px solid rgba(125, 255, 179, 0.25);
-  border-top-color: #7dffb3;
+  border: 3px solid var(--brand-soft);
+  border-top-color: var(--brand);
   animation: yard-spin 0.7s linear infinite;
 }
 @keyframes yard-spin {
@@ -157,23 +193,25 @@
   gap: 0.4rem;
 }
 .chip-select {
-  border: 1px solid var(--steel-bright);
+  border: 1px solid var(--steel);
   background: var(--bg-panel);
   color: var(--text);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0.35rem 0.7rem;
   font-size: 0.72rem;
   display: inline-flex;
   gap: 0.45rem;
   align-items: center;
   cursor: pointer;
+  font-weight: 600;
 }
 .chip-select.on {
-  border-color: var(--cyan-dim);
-  color: var(--cyan);
+  border-color: var(--brand-muted);
+  color: var(--brand-deep);
+  background: var(--brand-soft);
 }
 .chip-select.focus {
-  box-shadow: 0 0 0 1px var(--cyan);
+  box-shadow: 0 0 0 2px rgba(192, 36, 52, 0.2);
 }
 .chip-status {
   color: var(--text-dim);
@@ -190,14 +228,14 @@
 }
 
 .cp-2d-panel {
-  background: linear-gradient(180deg, rgba(18, 36, 30, 0.95), rgba(10, 22, 18, 0.98));
-  border: 1px solid rgba(125, 255, 179, 0.22);
+  background: #ffffff;
+  border: 1px solid var(--steel);
   border-radius: 14px;
   padding: 0.85rem 1rem 1rem;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+  box-shadow: var(--shadow-card);
 }
 .cp-2d-head {
   display: flex;
@@ -209,9 +247,10 @@
 .cp-2d-head h3 {
   margin: 0;
   font-size: 0.95rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #9ef0c5;
+  letter-spacing: -0.01em;
+  text-transform: none;
+  color: var(--brand);
+  font-weight: 700;
 }
 .cp-2d-head p {
   margin: 0.2rem 0 0;
@@ -228,39 +267,46 @@
   gap: 0.5rem;
 }
 .cp-btn {
-  border: 1px solid rgba(168, 200, 184, 0.35);
-  background: linear-gradient(180deg, #1d3d32, #142820);
-  color: #e8f5ef;
-  border-radius: 10px;
+  border: 1px solid var(--steel);
+  background: #ffffff;
+  color: var(--text);
+  border-radius: 999px;
   padding: 0.7rem 0.75rem;
   font-size: 0.82rem;
   font-weight: 650;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   cursor: pointer;
   min-height: 44px;
-  transition: border-color 0.15s ease, transform 0.1s ease, background 0.15s ease;
+  transition: border-color 0.15s ease, transform 0.1s ease, background 0.15s ease, color 0.15s ease;
 }
 .cp-btn:hover:not(:disabled) {
-  border-color: rgba(125, 255, 179, 0.55);
+  border-color: var(--brand-muted);
+  background: var(--brand-soft);
+  color: var(--brand-deep);
   transform: translateY(-1px);
 }
 .cp-btn:active:not(:disabled) {
   transform: translateY(1px);
 }
 .cp-btn.accent {
-  background: linear-gradient(180deg, #2a6b52, #184836);
-  border-color: rgba(125, 255, 179, 0.45);
-  color: #b8ffd8;
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #ffffff;
+}
+.cp-btn.accent:hover:not(:disabled) {
+  background: var(--brand-deep);
+  border-color: var(--brand-deep);
+  color: #ffffff;
 }
 .cp-btn.danger {
-  background: linear-gradient(180deg, #6b2a2e, #3f171a);
-  border-color: rgba(255, 138, 142, 0.45);
-  color: #ffb4b7;
+  background: var(--brand-soft);
+  border-color: var(--brand-muted);
+  color: var(--brand-deep);
 }
 .cp-btn.warn {
-  background: linear-gradient(180deg, #6b5a22, #3f3514);
-  border-color: rgba(255, 224, 130, 0.45);
-  color: #ffe8a8;
+  background: #fff7ed;
+  border-color: #fdba74;
+  color: #c2410c;
 }
 .cp-btn:disabled {
   opacity: 0.38;
@@ -273,7 +319,7 @@
   gap: 0.75rem 1.25rem;
   align-items: end;
   justify-content: space-between;
-  border-top: 1px solid rgba(125, 255, 179, 0.12);
+  border-top: 1px solid var(--steel);
   padding-top: 0.65rem;
 }
 .cp-2d-tip {
@@ -405,10 +451,11 @@
 
 .rail,
 .controls-rail {
-  background: var(--bg-panel);
+  background: #ffffff;
   border-right: 1px solid var(--steel);
   overflow: auto;
   max-height: calc(100vh - 72px - 160px);
+  box-shadow: inset -1px 0 0 transparent;
 }
 
 .controls-rail {
@@ -472,12 +519,21 @@
 .action-bar input,
 .action-bar select,
 .rfid-pad input {
-  background: var(--bg-deep);
-  border: 1px solid var(--steel-bright);
+  background: #ffffff;
+  border: 1px solid var(--steel);
   color: var(--text);
-  border-radius: var(--radius);
-  padding: 0.45rem 0.55rem;
+  border-radius: 10px;
+  padding: 0.5rem 0.65rem;
   font-size: 0.82rem;
+}
+.dock-form input:focus,
+.dock-form select:focus,
+.action-bar input:focus,
+.action-bar select:focus,
+.rfid-pad input:focus {
+  outline: none;
+  border-color: var(--brand-muted);
+  box-shadow: 0 0 0 3px rgba(192, 36, 52, 0.12);
 }
 .form-row {
   display: grid;
@@ -508,29 +564,36 @@
 .action-bar button,
 .ghost-btn,
 .chip {
-  border: 1px solid var(--steel-bright);
-  background: var(--bg-elevated);
+  border: 1px solid var(--steel);
+  background: #ffffff;
   color: var(--text);
-  border-radius: var(--radius);
-  padding: 0.45rem 0.7rem;
+  border-radius: var(--radius-pill);
+  padding: 0.5rem 0.85rem;
   font-size: 0.78rem;
+  font-weight: 600;
 }
 .primary-btn,
 .action-bar button.accent {
-  background: linear-gradient(180deg, #2a5a5a, #1a3a3a);
-  border-color: var(--cyan-dim);
-  color: var(--cyan);
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #ffffff;
 }
 .action-bar button.danger {
-  background: linear-gradient(180deg, #5a2a2e, #3a1a1c);
-  border-color: #7a3035;
-  color: #ff8a8e;
+  background: var(--brand-soft);
+  border-color: var(--brand-muted);
+  color: var(--brand-deep);
   width: 100%;
   margin-top: 0.35rem;
 }
 .ghost-btn {
-  background: transparent;
-  color: var(--text-dim);
+  background: var(--brand-soft);
+  border-color: transparent;
+  color: var(--brand-deep);
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+}
+.ghost-btn:hover {
+  background: #f7d4d7;
 }
 .primary-btn:disabled,
 .action-bar button:disabled {
@@ -557,15 +620,16 @@
   gap: 0.55rem;
   align-items: center;
   text-align: left;
-  background: var(--bg-deep);
+  background: #ffffff;
   border: 1px solid var(--steel);
-  border-radius: var(--radius);
+  border-radius: 12px;
   padding: 0.55rem;
   color: inherit;
 }
 .station-item.active {
-  border-color: var(--cyan-dim);
-  box-shadow: inset 0 0 0 1px var(--cyan-dim);
+  border-color: var(--brand-muted);
+  box-shadow: inset 3px 0 0 var(--brand);
+  background: var(--brand-soft);
 }
 .station-meta {
   display: flex;
@@ -910,11 +974,11 @@
   min-height: 280px;
   border-radius: 14px;
   overflow: hidden;
-  border: 1px solid var(--steel-bright);
-  background: #0c0f12;
+  border: 1px solid var(--steel);
+  background: #eef1f5;
   margin-bottom: 1rem;
   position: relative;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--shadow-card);
 }
 .ev-yard-3d canvas {
   width: 100% !important;
@@ -934,16 +998,17 @@
   flex-wrap: wrap;
   gap: 0.35rem 0.75rem;
   justify-content: center;
-  padding: 0.4rem 0.6rem;
-  background: linear-gradient(transparent, rgba(12, 15, 18, 0.92));
+  padding: 0.45rem 0.7rem;
+  background: linear-gradient(transparent, rgba(255, 255, 255, 0.92));
   color: var(--text-dim);
   font-size: 0.65rem;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
   pointer-events: none;
 }
 .ev-yard-legend .yard-state {
-  color: var(--cyan);
+  color: var(--brand);
   margin-left: 0.25rem;
+  font-weight: 700;
 }
 
 .cabinet-rfid {
@@ -995,14 +1060,14 @@
   cursor: pointer;
 }
 .cabinet-actions button.accent {
-  background: linear-gradient(180deg, #2a5a5a, #1a3a3a);
-  border-color: var(--cyan-dim);
-  color: var(--cyan);
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #ffffff;
 }
 .cabinet-actions button.danger-mini {
-  background: linear-gradient(180deg, #5a2a2e, #3a1a1c);
-  border-color: #7a3035;
-  color: #ff8a8e;
+  background: var(--brand-soft);
+  border-color: var(--brand-muted);
+  color: var(--brand-deep);
 }
 .cabinet-actions button:disabled {
   opacity: 0.4;
@@ -1017,17 +1082,17 @@
   z-index: 1;
 }
 .lcd-soft-keys button {
-  background: rgba(125, 255, 179, 0.08);
-  border: 1px solid rgba(125, 255, 179, 0.35);
-  color: var(--lcd-fg);
-  border-radius: 3px;
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-muted);
+  color: var(--brand-deep);
+  border-radius: 8px;
   padding: 0.3rem;
   font-size: 0.68rem;
   letter-spacing: 0.1em;
   cursor: pointer;
 }
 .lcd-soft-keys button:hover:not(:disabled) {
-  background: rgba(125, 255, 179, 0.18);
+  background: #f7d4d7;
 }
 .lcd-soft-keys button:disabled {
   opacity: 0.35;
@@ -1202,19 +1267,20 @@
 
 /* RFID */
 .rfid-pad {
-  background: var(--bg-deep);
+  background: #ffffff;
   border: 1px solid var(--steel);
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 0.75rem;
   display: flex;
   flex-direction: column;
   gap: 0.45rem;
+  box-shadow: var(--shadow-card);
 }
 .rfid-face {
   height: 72px;
-  border-radius: 8px;
-  background: radial-gradient(circle at center, #1a3030 0%, #0c1216 70%);
-  border: 1px solid var(--cyan-dim);
+  border-radius: 10px;
+  background: radial-gradient(circle at center, #3a1a22 0%, #1a1012 70%);
+  border: 1px solid var(--brand-muted);
   display: grid;
   place-items: center;
   position: relative;
@@ -1225,15 +1291,15 @@
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  border: 2px solid rgba(62, 207, 207, 0.35);
-  box-shadow: 0 0 16px rgba(62, 207, 207, 0.25);
+  border: 2px solid rgba(192, 36, 52, 0.4);
+  box-shadow: 0 0 16px rgba(192, 36, 52, 0.25);
   animation: pulse-charge 2.4s ease-in-out infinite;
 }
 .rfid-core {
   position: relative;
   font-size: 0.7rem;
   letter-spacing: 0.2em;
-  color: var(--cyan);
+  color: #ffb3bb;
 }
 .preset-row {
   display: flex;
@@ -1243,15 +1309,15 @@
 .chip {
   font-size: 0.65rem;
   padding: 0.25rem 0.4rem;
-  color: var(--cyan);
-  border-color: var(--cyan-dim);
-  background: transparent;
+  color: var(--brand-deep);
+  border-color: var(--brand-muted);
+  background: var(--brand-soft);
 }
 
 /* Trace drawer */
 .trace-drawer {
   border-top: 1px solid var(--steel);
-  background: rgba(12, 15, 18, 0.95);
+  background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(8px);
 }
 .trace-head {
@@ -1274,8 +1340,11 @@
   font-size: 0.72rem;
 }
 .trace-tabs button.active {
-  border-color: var(--steel-bright);
-  color: var(--text);
+  border-color: transparent;
+  background: var(--brand);
+  color: #ffffff;
+  border-radius: var(--radius-pill);
+  font-weight: 600;
 }
 .trace-body {
   max-height: 180px;
@@ -1296,9 +1365,10 @@
   gap: 0.5rem;
   font-size: 0.7rem;
   align-items: start;
-  padding: 0.25rem 0.35rem;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.02);
+  padding: 0.3rem 0.45rem;
+  border-radius: 8px;
+  background: #f9fafb;
+  font-family: var(--font-mono);
 }
 .trace-item.out .dir {
   color: var(--amber);
@@ -1327,16 +1397,17 @@
   top: 80px;
   right: 16px;
   z-index: 50;
-  background: #3a1a1c;
-  border: 1px solid #7a3035;
-  color: #ffb4b6;
+  background: var(--brand-soft);
+  border: 1px solid var(--brand-muted);
+  color: var(--brand-deep);
   padding: 0.7rem 0.9rem;
-  border-radius: 6px;
+  border-radius: 12px;
+  box-shadow: var(--shadow-card);
+  max-width: 360px;
+  font-weight: 600;
   display: flex;
   gap: 0.75rem;
   align-items: center;
-  max-width: 360px;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
 }
 .toast-error button {
   background: transparent;

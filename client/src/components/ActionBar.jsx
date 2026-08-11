@@ -82,7 +82,7 @@ export default function ActionBar({
     return (
       <div className="action-bar muted">
         <h2>Bench controls</h2>
-        <p>Commission a station to drive the Pier cabinet.</p>
+        <p>Commission a station to drive the Massive cabinet.</p>
       </div>
     );
   }

@@ -1,7 +1,7 @@
 {
-  "name": "pier-ocpp16-lab",
+  "name": "massive-mobility-charging-sim",
   "version": "1.0.0",
-  "description": "Pier OCPP 1.6 Charge Point lab console",
+  "description": "Massive Mobility Charging Simulator — OCPP 1.6 Charge Point console",
   "private": true,
   "type": "module",
   "scripts": {

@@ -183,8 +183,12 @@ export async function handleTriggerMessage(cp, payload) {
       return { status: 'Accepted' };
     }
     case 'DiagnosticsStatusNotification':
-    case 'FirmwareStatusNotification':
       return { status: 'NotImplemented' };
+    case 'FirmwareStatusNotification':
+      setImmediate(() => {
+        cp.sendFirmwareStatusNotification(cp.firmware?.status || 'Idle').catch(() => {});
+      });
+      return { status: 'Accepted' };
     default:
       return { status: 'NotImplemented' };
   }
@@ -281,6 +285,20 @@ export async function handleReserveNow(cp, payload) {
   return { status: 'Accepted' };
 }
 
+export async function handleUpdateFirmware(cp, payload) {
+  if (!payload?.location) {
+    throw new Error('UpdateFirmware.location is required');
+  }
+  cp.beginFirmwareUpdate({
+    location: payload.location,
+    retrieveDate: payload.retrieveDate,
+    retries: payload.retries,
+    retryInterval: payload.retryInterval,
+  });
+  // UpdateFirmware.conf is empty object
+  return {};
+}
+
 export async function handleCancelReservation(cp, payload) {
   const connector = cp.connectors.find((c) => c.reservationId === payload.reservationId);
   if (!connector) {
@@ -321,4 +339,5 @@ export const inboundHandlers = {
   DataTransfer: handleDataTransfer,
   ReserveNow: handleReserveNow,
   CancelReservation: handleCancelReservation,
+  UpdateFirmware: handleUpdateFirmware,
 };

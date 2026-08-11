@@ -29,7 +29,7 @@ const registry = new Registry({ io });
 /* ---------- REST API ---------- */
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, service: 'pier-ocpp16-lab', chargers: registry.chargers.size });
+  res.json({ ok: true, service: 'massive-mobility-charging-sim', chargers: registry.chargers.size });
 });
 
 app.get('/api/chargers', (_req, res) => {
@@ -238,7 +238,7 @@ if (isProd) {
 }
 
 server.listen(PORT, () => {
-  console.log(`Pier OCPP 1.6 Lab API on http://localhost:${PORT}`);
+  console.log(`Massive Mobility Charging Simulator API on http://localhost:${PORT}`);
   if (!isProd) {
     console.log('Vite client: run `npm run client` (proxies API to this port)');
   }

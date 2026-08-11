@@ -54,7 +54,7 @@ const b = await tryConnect(false);
 console.log('Without subprotocol:', b);
 
 if (a.ok || b.ok) {
-  console.log('CSMS REACHABLE — use the working subprotocol mode in Pier.');
+  console.log('CSMS REACHABLE — use the working subprotocol mode in the Massive Mobility simulator.');
   process.exit(0);
 }
 console.log('CSMS NOT REACHABLE from this network. Check URL, VPN, and firewall.');

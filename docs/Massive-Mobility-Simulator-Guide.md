@@ -1,18 +1,27 @@
-# Pier OCPP 1.6 Simulator — How It Works
+# Massive Mobility Charging Simulator — How It Works
 
-Short guide to the Pier Charge Point lab: what it is, how parts connect, and how a session runs.
+Short guide to the Massive Mobility OCPP 1.6 Charge Point simulator: what it is, how parts connect, and how a session runs.
 
 ---
 
-## 1. What Pier is
+## 1. What it is
 
-Pier is an **OCPP 1.6 Charge Point (EVSE) simulator**.
+This is an **OCPP 1.6 Charge Point (EVSE) simulator**.
 
 - It acts like a real charger talking to a CMS (for example Massive Charging).
 - It is **not** a CMS / Central System.
 - The browser UI is only a local control panel for the simulated charger.
 
-Brand in the lab: **Quillgrid Systems / Pier-16H**.
+Brand in the simulator: **Massive Mobility / Massive-CP-Sim-16**
+
+BootNotification identity defaults:
+
+| Field | Default |
+|------|---------|
+| Vendor | `Massive Mobility` |
+| Model | `Massive-CP-Sim-16` |
+| Serial | `MASSIVE-CPS-{cpId}` |
+| Firmware | `Massive-CPS-16.3.2.1` |
 
 Project folder:
 
@@ -53,7 +62,8 @@ Vite proxies `/api` and `/socket.io` from the UI to the backend.
              │  Socket.IO  (live state, logs, OCPP trace)
              ▼
 ┌──────────────────────────┐
-│  Pier backend (:8787)    │
+│  Simulator backend       │
+│  (:8787)                 │
 │  ChargePoint simulator   │
 └────────────┬─────────────┘
              │
@@ -70,21 +80,21 @@ Vite proxies `/api` and `/socket.io` from the UI to the backend.
 Important:
 
 - The **browser never speaks OCPP**.
-- Only the **Pier Node server** opens the OCPP WebSocket to the CMS.
-- UI commands go Pier API → Pier translates them into OCPP messages.
+- Only the **Node server** opens the OCPP WebSocket to the CMS.
+- UI commands go REST API → simulator translates them into OCPP messages.
 
 ---
 
 ## 5. What travels on each connection
 
-### A. Browser ↔ Pier (local)
+### A. Browser ↔ Simulator (local)
 
 | Channel | Used for |
 |---------|----------|
 | **REST `/api/...`** | Create station, plug, start/stop, fault, power, auth mode, reconnect, reset |
 | **Socket.IO** | Live charger state, meter values, OCPP message trace, logs |
 
-### B. Pier ↔ CMS (real protocol)
+### B. Simulator ↔ CMS (real protocol)
 
 | Channel | Used for |
 |---------|----------|
@@ -107,7 +117,7 @@ In the left **Stations** panel:
 3. Set connector count and per-outlet kW (and optional names).
 4. Click **Connect EVSE**.
 
-Pier connects to:
+The simulator connects to:
 
 `{baseUrl}/{cpId}`
 
@@ -120,10 +130,10 @@ Example:
 ## 7. What happens after connect
 
 1. WebSocket opens to CMS.
-2. Pier sends **BootNotification** (vendor, model, serial, firmware).
+2. Simulator sends **BootNotification** (vendor, model, serial, firmware).
 3. CMS replies Accepted / Pending / Rejected + heartbeat interval.
-4. Pier sends **StatusNotification** for connector `0` (whole CP) and each gun `1…N`.
-5. Pier may announce connector info (name/type/power) via StatusNotification `info` and a DataTransfer.
+4. Simulator sends **StatusNotification** for connector `0` (whole CP) and each gun `1…N`.
+5. Simulator may announce connector info (name/type/power) via StatusNotification `info` and a DataTransfer.
 6. **Heartbeat** starts on the CMS interval.
 
 After that the station shows **online**.
@@ -132,10 +142,10 @@ After that the station shows **online**.
 
 ## 8. How a charging session works
 
-### Local start (from Pier UI / 3D screen)
+### Local start (from UI / 3D screen)
 
 1. Select connector (C1, C2, …).
-2. Plug cable (or Pier auto-plugs on start).
+2. Plug cable (or auto-plug on start).
 3. **Authorize** idTag (local list and/or CMS, depending on auth mode).
 4. **StartTransaction** → CMS returns `transactionId`.
 5. Status → **Charging**; **MeterValues** sent periodically.
@@ -144,24 +154,24 @@ After that the station shows **online**.
 ### Remote start (from CMS / app)
 
 1. CMS sends **RemoteStartTransaction**.
-2. Pier accepts and runs the same Authorize / StartTransaction path.
+2. Simulator accepts and runs the same Authorize / StartTransaction path.
 3. CMS can later send **RemoteStopTransaction**.
 
 ---
 
 ## 9. Multi-connector notes
 
-- Pier supports **1–4** outlets plus connector **0** (charge point).
+- Supports **1–4** outlets plus connector **0** (charge point).
 - Each outlet has its own status, meter, and transaction.
 - Many CMS platforms (including Massive) **block the same RFID** on two concurrent sessions (`Blocked` / `ConcurrentTx`).
 - For parallel charging, use a **different CMS-registered idTag** per connector.
-- Pier will try alternate lab tags when the current one is already in use.
+- The simulator will try alternate lab tags when the current one is already in use.
 
 Default lab tags:
 
 - `CARD-7F2A91`
 - `FOB-ORBIT-44`
-- `TOKEN-QUILL-09`
+- `TOKEN-MASSIVE-09`
 
 Auth modes:
 
@@ -175,7 +185,7 @@ Auth modes:
 
 | UI area | What it does | Reaches CMS? |
 |---------|--------------|--------------|
-| **3D charge point** | Touch screen + physical soft keys, outlets, RFID | Yes, via Pier API → OCPP |
+| **3D charge point** | Touch screen + physical soft keys, outlets, RFID | Yes, via API → OCPP |
 | **Operator panel (2D)** | Easy start/stop/plug/E-stop, idTag, kW | Yes, same path |
 | **Stations dock** | Commission / select / remove CP | Creates OCPP connection |
 | **Bench controls** | Fault, suspend, auth mode, reconnect, reset | Mixed (local sim + OCPP) |
@@ -208,7 +218,7 @@ Flow for a button press:
 
 ## 12. What is local-only (not OCPP)
 
-These stay inside Pier / browser:
+These stay inside the simulator / browser:
 
 - 3D graphics and layout
 - Socket.IO live feed to the UI
@@ -227,7 +237,7 @@ The CMS only sees the **OCPP WebSocket messages**.
 | UI up, station offline | Wrong base URL / cpId, CMS down, TLS/auth issue |
 | `Authorize Invalid` | Tag not accepted by CMS; try Local or CMS mode, or a real RFID |
 | `StartTransaction idTag Blocked` | Same RFID already charging on another outlet |
-| Stuck on Finishing in CMS | Older builds; current Pier sends Available after stop — reconnect station |
+| Stuck on Finishing in CMS | Older builds; current build sends Available after stop — reconnect station |
 | Boot / ChangeConfiguration show `connectorId: null` | Normal — those are charge-point level messages |
 | Need per-outlet status | Look for StatusNotification with connectorId 1, 2, … |
 
@@ -235,9 +245,9 @@ The CMS only sees the **OCPP WebSocket messages**.
 
 ## 14. One-line summary
 
-**Browser controls Pier; Pier speaks OCPP to the CMS.**  
+**Browser controls the simulator; the simulator speaks OCPP to the CMS.**  
 WebSocket for OCPP is only Backend ↔ CMS. REST + Socket.IO are only Browser ↔ Backend.
 
 ---
 
-*Pier OCPP 1.6 Charge Point lab — connection and operation overview.*
+*Massive Mobility Charging Simulator — OCPP 1.6 Charge Point — connection and operation overview.*

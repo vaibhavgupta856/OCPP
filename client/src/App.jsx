@@ -154,10 +154,12 @@ export default function App() {
     <div className="console-shell yard-first">
       <header className="console-top">
         <div className="brand-block">
-          <div className="brand-mark" aria-hidden />
+          <div className="brand-mark" aria-hidden>
+            <span />
+          </div>
           <div>
-            <h1 className="brand-name">Pier</h1>
-            <p className="brand-sub">Charge Point Lab · OCPP 1.6J</p>
+            <h1 className="brand-name">Massive Mobility</h1>
+            <p className="brand-sub">Charging Simulator · Workspace: Massive Charging</p>
           </div>
         </div>
         <div className="top-meta">
@@ -214,7 +216,7 @@ export default function App() {
           ) : (
             <div className="empty-stage">
               <h2>No station on the bench</h2>
-              <p>Commission a charge point from the left rail to open the Pier yard.</p>
+              <p>Commission a charge point from the left rail to open the yard.</p>
             </div>
           )}
         </main>

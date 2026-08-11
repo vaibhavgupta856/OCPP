@@ -20,7 +20,7 @@ const DEFAULTS = {
   BlinkRepeat: '0',
   LightIntensity: '100',
   MaxEnergyOnInvalidId: '0',
-  SupportedFeatureProfiles: 'Core,LocalAuthListManagement,Reservation,RemoteTrigger,SmartCharging',
+  SupportedFeatureProfiles: 'Core,FirmwareManagement,LocalAuthListManagement,Reservation,RemoteTrigger,SmartCharging',
   NumberOfConnectors: '1',
   ConnectorPhaseRotation: 'NotApplicable',
   GetConfigurationMaxKeys: '50',

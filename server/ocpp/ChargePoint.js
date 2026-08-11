@@ -33,10 +33,17 @@ export class ChargePoint {
     this.requireSubprotocol = options.requireSubprotocol !== false;
     this.basicAuth = options.basicAuth || null;
     this.identity = {
-      chargePointVendor: options.vendor || 'Quillgrid Systems',
-      chargePointModel: options.model || 'Pier-16H',
-      chargePointSerialNumber: options.serial || `QG-P16-${this.cpId}`,
-      firmwareVersion: options.firmware || '2.4.1-lab',
+      chargePointVendor: options.vendor || 'Massive Mobility',
+      chargePointModel: options.model || 'Massive-CP-Sim-16',
+      chargePointSerialNumber: options.serial || `MASSIVE-CPS-${this.cpId}`,
+      // BootNotification firmwareVersion — Massive Mobility CP simulator firmware
+      firmwareVersion: options.firmware || 'Massive-CPS-16.3.2.1',
+    };
+    this.firmware = {
+      status: 'Idle', // OCPP FirmwareStatusNotification status
+      location: null,
+      retrieveDate: null,
+      updateTimer: null,
     };
 
     this.onState = onState || (() => {});
@@ -96,7 +103,7 @@ export class ChargePoint {
     this.localAuthList = new Map([
       ['CARD-7F2A91', { status: 'Accepted' }],
       ['FOB-ORBIT-44', { status: 'Accepted' }],
-      ['TOKEN-QUILL-09', { status: 'Accepted' }],
+      ['TOKEN-MASSIVE-09', { status: 'Accepted' }],
     ]);
     this.localAuthListVersion = 1;
     // csms = trust CMS only | local = local list only | local_or_csms = accept either (simulator default)
@@ -124,6 +131,7 @@ export class ChargePoint {
       bootAccepted: this.bootAccepted,
       requireSubprotocol: this.requireSubprotocol,
       identity: this.identity,
+      firmwareStatus: this.firmware.status,
       config: this.config.snapshot(),
       localAuthListVersion: this.localAuthListVersion,
       localAuthTags: [...this.localAuthList.keys()],
@@ -185,6 +193,10 @@ export class ChargePoint {
     this._clearReconnect();
     this._stopHeartbeat();
     this._stopAllMeters();
+    if (this.firmware?.updateTimer) {
+      clearTimeout(this.firmware.updateTimer);
+      this.firmware.updateTimer = null;
+    }
     for (const t of this.reservationTimers.values()) clearTimeout(t);
     this.reservationTimers.clear();
 
@@ -477,6 +489,115 @@ export class ChargePoint {
     return this.sendCall('Heartbeat', {});
   }
 
+  async sendFirmwareStatusNotification(status) {
+    this.firmware.status = status;
+    this.broadcastState();
+    try {
+      await this.sendCall('FirmwareStatusNotification', { status });
+    } catch (err) {
+      this.log('warn', `FirmwareStatusNotification failed: ${err.message}`);
+    }
+  }
+
+  /**
+   * Simulate OCPP UpdateFirmware: download → install → new FW version → Idle.
+   * Location URL may end with a version token (e.g. .../Massive-CPS-16.3.2.2.bin).
+   */
+  beginFirmwareUpdate({ location, retrieveDate, retries = 1, retryInterval = 60 } = {}) {
+    if (this.firmware.updateTimer) {
+      clearTimeout(this.firmware.updateTimer);
+      this.firmware.updateTimer = null;
+    }
+
+    this.firmware.location = location || null;
+    this.firmware.retrieveDate = retrieveDate || null;
+    const retryCount = Number.isFinite(Number(retries)) ? Math.max(0, Number(retries)) : 1;
+    const retrySec = Number.isFinite(Number(retryInterval)) ? Math.max(1, Number(retryInterval)) : 60;
+
+    const nextVersionFromLocation = (url) => {
+      const base = String(url || '').split(/[?#]/)[0];
+      const file = base.split('/').pop() || '';
+      const match = file.match(/(Massive-CPS-16(?:\.\d+){1,3}|MM-CPS-16(?:\.\d+){1,3}|v?\d+\.\d+\.\d+)/i);
+      if (match) {
+        let v = match[1].replace(/^v/i, '');
+        if (/^MM-CPS-16/i.test(v)) v = v.replace(/^MM-CPS-16/i, 'Massive-CPS-16');
+        return /^Massive-CPS-16/i.test(v) ? v : `Massive-CPS-16.${v}`;
+      }
+      // bump patch of current FW
+      const cur = String(this.identity.firmwareVersion || 'Massive-CPS-16.3.2.1');
+      const parts = cur
+        .replace(/^Massive-CPS-16\.?/i, '')
+        .replace(/^MM-CPS-16\.?/i, '')
+        .split('.')
+        .map((n) => Number(n) || 0);
+      while (parts.length < 3) parts.push(0);
+      parts[parts.length - 1] += 1;
+      return `Massive-CPS-16.${parts.join('.')}`;
+    };
+
+    const schedule = (fn, ms) => {
+      this.firmware.updateTimer = setTimeout(fn, ms);
+    };
+
+    const fail = async (status, reason) => {
+      this.log('error', `Firmware update ${status}: ${reason}`);
+      await this.sendFirmwareStatusNotification(status);
+      schedule(async () => {
+        await this.sendFirmwareStatusNotification('Idle');
+      }, 1500);
+    };
+
+    const runAttempt = (attempt) => {
+      this.log('info', `Firmware update attempt ${attempt + 1} from ${location || '(no location)'}`);
+      schedule(async () => {
+        await this.sendFirmwareStatusNotification('Downloading');
+        schedule(async () => {
+          if (!location) {
+            if (attempt < retryCount) {
+              await this.sendFirmwareStatusNotification('DownloadFailed');
+              schedule(() => runAttempt(attempt + 1), retrySec * 1000);
+              return;
+            }
+            await fail('DownloadFailed', 'missing location');
+            return;
+          }
+          await this.sendFirmwareStatusNotification('Downloaded');
+          schedule(async () => {
+            await this.sendFirmwareStatusNotification('Installing');
+            schedule(async () => {
+              const next = nextVersionFromLocation(location);
+              this.identity.firmwareVersion = next;
+              this.log('info', `Firmware installed: ${next}`);
+              await this.sendFirmwareStatusNotification('Installed');
+              this.broadcastState();
+              schedule(async () => {
+                await this.sendFirmwareStatusNotification('Idle');
+                // Soft re-boot so CMS sees new firmwareVersion in BootNotification
+                try {
+                  await this.sendBootNotification();
+                } catch (err) {
+                  this.log('warn', `Post-FW BootNotification failed: ${err.message}`);
+                }
+              }, 1200);
+            }, 2200);
+          }, 1500);
+        }, 1800);
+      }, 400);
+    };
+
+    // Honor retrieveDate if far in the future; otherwise start soon
+    let delayMs = 800;
+    if (retrieveDate) {
+      const when = Date.parse(retrieveDate);
+      if (Number.isFinite(when)) {
+        delayMs = Math.max(0, when - Date.now());
+        // Cap lab delay so the UI doesn't wait hours
+        delayMs = Math.min(delayMs, 15_000);
+      }
+    }
+    schedule(() => runAttempt(0), delayMs);
+  }
+
   restartHeartbeat() {
     this._stopHeartbeat();
     const sec = Math.max(5, this.config.getNumber('HeartbeatInterval', 60));
@@ -572,7 +693,7 @@ export class ChargePoint {
       }));
     try {
       const conf = await this.sendCall('DataTransfer', {
-        vendorId: this.identity.chargePointVendor || 'QuillgridSystems',
+        vendorId: this.identity.chargePointVendor || 'MassiveMobility',
         messageId: 'ConnectorConfiguration',
         data: JSON.stringify({ connectors }),
       });

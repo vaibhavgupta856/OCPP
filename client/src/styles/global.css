@@ -1,26 +1,44 @@
 :root {
-  --bg-deep: #0c0f12;
-  --bg-panel: #141a1f;
-  --bg-elevated: #1a2229;
-  --steel: #2a343d;
-  --steel-bright: #3d4a56;
-  --amber: #f0a202;
-  --amber-dim: #a06d02;
-  --cyan: #3ecfcf;
-  --cyan-dim: #1f7a7a;
-  --signal-green: #3ddc97;
-  --signal-red: #ff5a5f;
-  --signal-orange: #ff9f1c;
-  --text: #e8eef2;
-  --text-dim: #8b9aa8;
-  --lcd-bg: #0a1a12;
-  --lcd-fg: #7dffb3;
-  --lcd-dim: #2a6b48;
-  --font-display: 'Syne', sans-serif;
+  /* Massive Mobility / Massive Charging console palette */
+  --brand: #c02434;
+  --brand-deep: #9b1c2a;
+  --brand-soft: #fbeaea;
+  --brand-rose: #fde8e9;
+  --brand-muted: #e8a3aa;
+
+  --bg-deep: #f5f6f8;
+  --bg-panel: #ffffff;
+  --bg-elevated: #ffffff;
+  --steel: #e5e7eb;
+  --steel-bright: #d1d5db;
+
+  /* Map legacy accent tokens → Massive brand so existing rules restyle */
+  --cyan: var(--brand);
+  --cyan-dim: var(--brand-deep);
+  --amber: var(--brand);
+  --amber-dim: var(--brand-deep);
+
+  --signal-green: #10b981;
+  --signal-red: #c02434;
+  --signal-orange: #f59e0b;
+  --signal-blue: #2563eb;
+
+  --text: #111827;
+  --text-dim: #6b7280;
+
+  --lcd-bg: #1a1012;
+  --lcd-fg: #ffd6db;
+  --lcd-dim: #c47a84;
+
+  --font-display: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
+  --font-body: 'Plus Jakarta Sans', 'Segoe UI', sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
-  --radius: 4px;
-  --glow-cyan: 0 0 24px rgba(62, 207, 207, 0.25);
-  --glow-amber: 0 0 20px rgba(240, 162, 2, 0.35);
+
+  --radius: 10px;
+  --radius-pill: 999px;
+  --glow-cyan: 0 0 0 3px rgba(192, 36, 52, 0.12);
+  --glow-amber: 0 0 0 3px rgba(192, 36, 52, 0.16);
+  --shadow-card: 0 1px 2px rgba(17, 24, 39, 0.04), 0 8px 24px rgba(17, 24, 39, 0.06);
 }
 
 * {
@@ -34,14 +52,15 @@ body,
   min-height: 100%;
   background: var(--bg-deep);
   color: var(--text);
-  font-family: var(--font-mono);
+  font-family: var(--font-body);
 }
 
 body {
+  background-color: var(--bg-deep);
   background-image:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(62, 207, 207, 0.08), transparent),
-    radial-gradient(ellipse 40% 40% at 100% 100%, rgba(240, 162, 2, 0.06), transparent),
-    linear-gradient(180deg, #0c0f12 0%, #0e1318 100%);
+    radial-gradient(ellipse 70% 45% at 0% 0%, rgba(192, 36, 52, 0.06), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 100% 0%, rgba(253, 232, 233, 0.9), transparent 50%),
+    linear-gradient(180deg, #f8f9fb 0%, #f3f4f6 100%);
   background-attachment: fixed;
 }
 
@@ -60,7 +79,7 @@ button {
   height: 8px;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--steel-bright);
+  background: #c4c9d1;
   border-radius: 4px;
 }
 ::-webkit-scrollbar-track {
@@ -109,9 +128,9 @@ button {
 @keyframes reconnect-glow {
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(240, 162, 2, 0.2);
+    box-shadow: 0 0 0 0 rgba(192, 36, 52, 0.15);
   }
   50% {
-    box-shadow: 0 0 18px 2px rgba(240, 162, 2, 0.45);
+    box-shadow: 0 0 0 4px rgba(192, 36, 52, 0.18);
   }
 }

@@ -1,5 +1,5 @@
 {
-  "name": "pier-ocpp16-lab-client",
+  "name": "massive-mobility-charging-sim-client",
   "private": true,
   "version": "1.0.0",
   "type": "module",

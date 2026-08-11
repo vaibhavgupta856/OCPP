@@ -1,69 +1,24 @@
 import { useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Sky } from '@react-three/drei';
-import PierChargerMesh from './PierChargerMesh.jsx';
+import { OrbitControls } from '@react-three/drei';
+import MassiveChargerMesh from './MassiveChargerMesh.jsx';
 
-function StationPad({ bayCount = 1 }) {
-  const w = Math.max(10, bayCount * 1.2 + 8);
+/** Simple pad under the charger — no canopy / tent / clouds */
+function StationPad() {
   return (
     <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-        <planeGeometry args={[w, 12]} />
-        <meshStandardMaterial color="#2c3036" roughness={0.95} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0.2]} receiveShadow>
+        <planeGeometry args={[8, 8]} />
+        <meshStandardMaterial color="#3a3f48" roughness={0.95} />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.012, 0]} receiveShadow>
-        <planeGeometry args={[Math.max(4.5, bayCount * 0.8 + 3.5), 3.2]} />
-        <meshStandardMaterial color="#5c636a" roughness={0.85} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0.15]} receiveShadow>
+        <planeGeometry args={[4.2, 3.6]} />
+        <meshStandardMaterial color="#d1d5db" roughness={0.88} />
       </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.03, 0]} receiveShadow>
-        <circleGeometry args={[24, 32]} />
-        <meshStandardMaterial color="#3f6b3f" roughness={1} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
+        <circleGeometry args={[14, 32]} />
+        <meshStandardMaterial color="#e5e7eb" roughness={1} />
       </mesh>
-    </group>
-  );
-}
-
-function Canopy({ bayCount = 1 }) {
-  const w = Math.max(9, bayCount * 1.2 + 7);
-  return (
-    <group>
-      <mesh position={[0, 5.1, 0]} castShadow receiveShadow>
-        <boxGeometry args={[w, 0.14, 6]} />
-        <meshStandardMaterial color="#eef3f6" metalness={0.35} roughness={0.4} />
-      </mesh>
-      <mesh position={[0, 4.95, 0]}>
-        <boxGeometry args={[w - 0.4, 0.1, 5.6]} />
-        <meshStandardMaterial color="#0c3328" metalness={0.25} roughness={0.45} />
-      </mesh>
-      {[
-        [-w / 2 + 0.45, 2.45, -2.2],
-        [w / 2 - 0.45, 2.45, -2.2],
-        [-w / 2 + 0.45, 2.45, 2.2],
-        [w / 2 - 0.45, 2.45, 2.2],
-      ].map((p, i) => (
-        <mesh key={i} position={p} castShadow>
-          <cylinderGeometry args={[0.1, 0.12, 5.0, 10]} />
-          <meshStandardMaterial color="#cfd6dc" metalness={0.65} roughness={0.28} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
-
-function SimpleClouds() {
-  const puffs = [
-    [-8, 11, -14, 3.2, 0.7],
-    [7, 12, -18, 4.0, 0.85],
-    [14, 10, 2, 2.8, 0.65],
-  ];
-  return (
-    <group>
-      {puffs.map(([x, y, z, sx, sy], i) => (
-        <mesh key={i} position={[x, y, z]} scale={[sx, sy, 1.2]}>
-          <sphereGeometry args={[1, 10, 8]} />
-          <meshBasicMaterial color="#ffffff" transparent opacity={0.4} depthWrite={false} />
-        </mesh>
-      ))}
     </group>
   );
 }
@@ -77,6 +32,8 @@ function SceneContent(props) {
     connectionState,
     cpId,
     busy,
+    identity,
+    firmwareStatus,
     onSelectOutlet,
     onToggleSelectOutlet,
     onOutletPlug,
@@ -88,49 +45,31 @@ function SceneContent(props) {
   } = props;
 
   const guns = useMemo(() => connectors.filter((c) => c.number > 0), [connectors]);
-  const bayCount = guns.length || 1;
 
   return (
     <>
-      <color attach="background" args={['#87b7d9']} />
-      <fog attach="fog" args={['#c5d8e8', 22, 52]} />
+      <color attach="background" args={['#eef1f5']} />
+      <fog attach="fog" args={['#e8ecf1', 18, 42]} />
 
-      <Sky
-        distance={450000}
-        sunPosition={[28, 22, 16]}
-        inclination={0.48}
-        azimuth={0.18}
-        mieCoefficient={0.005}
-        mieDirectionalG={0.8}
-        rayleigh={1.2}
-        turbidity={2.5}
-      />
-      <mesh position={[28, 22, 16]}>
-        <sphereGeometry args={[2.0, 12, 12]} />
-        <meshBasicMaterial color="#ffe9a8" toneMapped={false} />
-      </mesh>
-      <SimpleClouds />
-
-      <hemisphereLight args={['#eaf4ff', '#4a5c3a', 0.7]} />
-      <ambientLight intensity={0.45} />
+      <hemisphereLight args={['#ffffff', '#c4c9d2', 0.7]} />
+      <ambientLight intensity={0.6} />
       <directionalLight
         castShadow
-        position={[14, 18, 10]}
-        intensity={1.45}
+        position={[8, 14, 8]}
+        intensity={1.25}
         shadow-mapSize-width={1024}
         shadow-mapSize-height={1024}
-        shadow-camera-far={40}
-        shadow-camera-left={-10}
-        shadow-camera-right={10}
-        shadow-camera-top={10}
-        shadow-camera-bottom={-10}
-        color="#fff3d6"
+        shadow-camera-far={30}
+        shadow-camera-left={-8}
+        shadow-camera-right={8}
+        shadow-camera-top={8}
+        shadow-camera-bottom={-8}
+        color="#fff8f6"
       />
 
-      <StationPad bayCount={bayCount} />
-      <Canopy bayCount={bayCount} />
+      <StationPad />
 
-      <PierChargerMesh
+      <MassiveChargerMesh
         connectors={connectors}
         activeConnector={activeConnector}
         selectedConnectors={selectedConnectors}
@@ -138,6 +77,8 @@ function SceneContent(props) {
         charging={guns.some((c) => c.status === 'Charging')}
         connectionState={connectionState}
         cpId={cpId}
+        identity={identity}
+        firmwareStatus={firmwareStatus}
         busy={busy}
         onSelectOutlet={onSelectOutlet}
         onToggleSelectOutlet={onToggleSelectOutlet}
@@ -152,11 +93,11 @@ function SceneContent(props) {
       <OrbitControls
         makeDefault
         enablePan
-        minPolarAngle={0.15}
-        maxPolarAngle={1.4}
-        minDistance={3.5}
+        minPolarAngle={0.2}
+        maxPolarAngle={1.45}
+        minDistance={4}
         maxDistance={18}
-        target={[0, 1.8, 0]}
+        target={[0, 2.4, 0]}
       />
     </>
   );
@@ -172,15 +113,15 @@ export default function EvYard3D(props) {
     <div className="ev-yard-3d roomy">
       <Canvas
         shadows
-        dpr={[1, 1.25]}
-        camera={{ position: [5.2, 3.6, 6.8], fov: 36 }}
+        dpr={[1, 1.5]}
+        camera={{ position: [6.8, 4.6, 8.2], fov: 38 }}
         gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
       >
         <SceneContent {...props} />
       </Canvas>
       <div className="ev-yard-legend">
-        <span>Touch the CP screen buttons</span>
-        <span>Physical keys are backup</span>
+        <span>Touch the CP screen</span>
+        <span>Physical keys below screen</span>
         <span>Drag orbit · scroll zoom</span>
         <span className="yard-state">
           {selectedConnectors.length > 1

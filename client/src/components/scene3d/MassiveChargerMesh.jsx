@@ -1,12 +1,51 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
+import * as THREE from 'three';
 import ChargerLcdScreen from './ChargerLcdScreen.jsx';
 import CanvasLabel from './CanvasLabel.jsx';
 
+function makeKeyTexture(label, {
+  fill = '#e8f0ec',
+  text = '#1a1012',
+  disabled = false,
+} = {}) {
+  const c = document.createElement('canvas');
+  c.width = 512;
+  c.height = 256;
+  const ctx = c.getContext('2d');
+
+  ctx.fillStyle = disabled ? '#6a7a72' : fill;
+  ctx.fillRect(0, 0, c.width, c.height);
+
+  // soft inner edge
+  ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+  ctx.lineWidth = 10;
+  ctx.strokeRect(8, 8, c.width - 16, c.height - 16);
+
+  const title = String(label ?? '');
+  let size = 92;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  do {
+    ctx.font = `800 ${size}px system-ui, Segoe UI, Arial, sans-serif`;
+    if (ctx.measureText(title).width <= c.width * 0.86 || size <= 36) break;
+    size -= 4;
+  } while (size > 36);
+
+  ctx.fillStyle = disabled ? 'rgba(10,34,24,0.35)' : text;
+  ctx.fillText(title, c.width / 2, c.height / 2);
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  tex.needsUpdate = true;
+  return tex;
+}
+
 function SoftKey({
   position,
-  w = 0.32,
-  h = 0.15,
+  w = 0.38,
+  h = 0.18,
   color = '#e8f0ec',
   label,
   disabled,
@@ -16,18 +55,23 @@ function SoftKey({
 }) {
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
-  const zPush = pressed ? -0.014 : 0;
-  const cap = danger ? '#c62828' : color;
-  const labelColor = danger ? '#ffebee' : '#0a2218';
+  const zPush = pressed ? -0.012 : 0;
+  const fill = danger ? '#c62828' : color;
+  const textColor = danger ? '#ffffff' : '#1a1012';
+
+  const texture = useMemo(
+    () => makeKeyTexture(label, { fill, text: textColor, disabled: !!disabled }),
+    [label, fill, textColor, disabled]
+  );
 
   return (
     <group position={position}>
-      <mesh position={[0, 0, -0.012]}>
-        <boxGeometry args={[w + 0.045, h + 0.045, 0.03]} />
-        <meshStandardMaterial color="#071a14" metalness={0.5} roughness={0.45} />
+      <mesh position={[0, 0, -0.014]}>
+        <boxGeometry args={[w + 0.05, h + 0.05, 0.032]} />
+        <meshStandardMaterial color="#12151a" metalness={0.5} roughness={0.45} />
       </mesh>
       <mesh
-        position={[0, 0, 0.016 + zPush]}
+        position={[0, 0, 0.012 + zPush]}
         castShadow
         onPointerOver={(e) => {
           e.stopPropagation();
@@ -49,35 +93,37 @@ function SoftKey({
           if (!disabled) onClick?.(e);
         }}
       >
-        <boxGeometry args={[w, h, 0.034]} />
+        <boxGeometry args={[w, h, 0.036]} />
         <meshStandardMaterial
-          color={cap}
+          color={fill}
           emissive={
             hovered && !disabled
               ? danger
                 ? '#ff1744'
                 : accent
-                  ? '#1f7a55'
-                  : '#2a4a3a'
+                  ? '#c02434'
+                  : '#6b7280'
               : danger
                 ? '#7f1010'
-                : '#000'
+                : '#000000'
           }
-          emissiveIntensity={hovered && !disabled ? 0.35 : danger ? 0.12 : 0}
-          metalness={0.15}
-          roughness={0.5}
+          emissiveIntensity={hovered && !disabled ? 0.28 : danger ? 0.1 : 0}
+          metalness={0.08}
+          roughness={0.55}
           transparent={disabled}
-          opacity={disabled ? 0.4 : 1}
+          opacity={disabled ? 0.55 : 1}
         />
       </mesh>
-      <CanvasLabel
-        text={label}
-        position={[0, 0, 0.038 + zPush]}
-        width={w * 0.92}
-        height={Math.min(0.07, h * 0.55)}
-        fontSize={44}
-        color={labelColor}
-      />
+      {/* Label on front face only — always readable */}
+      <mesh position={[0, 0, 0.034 + zPush]} renderOrder={2}>
+        <planeGeometry args={[w * 0.94, h * 0.82]} />
+        <meshBasicMaterial
+          map={texture}
+          transparent
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
     </group>
   );
 }
@@ -133,10 +179,62 @@ function MushroomStop({ position, disabled, onClick }) {
   );
 }
 
+function RfidPad({ position, disabled, onClick }) {
+  const [hovered, setHovered] = useState(false);
+  const texture = useMemo(
+    () =>
+      makeKeyTexture('TAP RFID / NFC', {
+        fill: '#3a1a22',
+        text: '#ffb3bb',
+        disabled: !!disabled,
+      }),
+    [disabled]
+  );
+
+  return (
+    <group position={position}>
+      <mesh position={[0, 0, -0.01]}>
+        <boxGeometry args={[1.35, 0.42, 0.05]} />
+        <meshStandardMaterial color="#1a1012" metalness={0.4} roughness={0.4} />
+      </mesh>
+      <mesh
+        position={[0, 0, 0.02]}
+        castShadow
+        onClick={(e) => {
+          e.stopPropagation();
+          if (!disabled) onClick?.(e);
+        }}
+        onPointerOver={(e) => {
+          e.stopPropagation();
+          if (!disabled) setHovered(true);
+          document.body.style.cursor = disabled ? 'not-allowed' : 'pointer';
+        }}
+        onPointerOut={() => {
+          setHovered(false);
+          document.body.style.cursor = 'default';
+        }}
+      >
+        <boxGeometry args={[1.22, 0.34, 0.04]} />
+        <meshStandardMaterial
+          color="#3a1a22"
+          emissive={hovered && !disabled ? '#c02434' : '#9b1c2a'}
+          emissiveIntensity={hovered && !disabled ? 0.45 : 0.25}
+          metalness={0.25}
+          roughness={0.4}
+        />
+      </mesh>
+      <mesh position={[0, 0, 0.045]} renderOrder={3}>
+        <planeGeometry args={[1.12, 0.28]} />
+        <meshBasicMaterial map={texture} transparent depthWrite={false} toneMapped={false} />
+      </mesh>
+    </group>
+  );
+}
+
 /**
  * Large CP cabinet — full title, touch HMI, clean physical controls
  */
-export default function PierChargerMesh({
+export default function MassiveChargerMesh({
   connectors = [],
   activeConnector = 1,
   selectedConnectors = [],
@@ -144,6 +242,8 @@ export default function PierChargerMesh({
   charging = false,
   connectionState = 'offline',
   cpId = '',
+  identity = null,
+  firmwareStatus = 'Idle',
   busy = false,
   onSelectOutlet,
   onToggleSelectOutlet,
@@ -156,10 +256,10 @@ export default function PierChargerMesh({
 }) {
   const ledRef = useRef();
   const [page, setPage] = useState('home');
-  const darkGreen = '#0c3328';
-  const midGreen = '#126b4f';
-  const deepGreen = '#071f18';
-  const white = '#f2f6f4';
+  const cabinet = '#2b3038';
+  const accent = '#c02434';
+  const deep = '#171a1f';
+  const white = '#f7f8fa';
   const silver = '#d7dde2';
 
   const guns = connectors.filter((c) => c.number > 0);
@@ -180,11 +280,11 @@ export default function PierChargerMesh({
   });
 
   return (
-    <group position={[0, 0, 0]} scale={[1.28, 1.28, 1.28]}>
+    <group position={[0, 0, 0]} scale={[1.72, 1.72, 1.72]}>
       {/* Foundation */}
       <mesh position={[0, 0.12, 0]} castShadow receiveShadow>
         <boxGeometry args={[width + 0.7, 0.24, 1.35]} />
-        <meshStandardMaterial color={deepGreen} metalness={0.35} roughness={0.55} />
+        <meshStandardMaterial color={deep} metalness={0.35} roughness={0.55} />
       </mesh>
       <mesh position={[0, 0.28, 0]} castShadow>
         <boxGeometry args={[width + 0.4, 0.08, 1.15]} />
@@ -194,7 +294,7 @@ export default function PierChargerMesh({
       {/* Main cabinet */}
       <mesh position={[0, 1.75, 0]} castShadow receiveShadow>
         <boxGeometry args={[width, 2.95, 1.05]} />
-        <meshStandardMaterial color={darkGreen} metalness={0.48} roughness={0.3} />
+        <meshStandardMaterial color={cabinet} metalness={0.48} roughness={0.3} />
       </mesh>
 
       {/* White face */}
@@ -216,10 +316,10 @@ export default function PierChargerMesh({
       {/* Full brand title bar */}
       <mesh position={[0, 3.15, 0.58]} castShadow>
         <boxGeometry args={[Math.min(width - 0.35, 2.2), 0.16, 0.04]} />
-        <meshStandardMaterial color={midGreen} emissive={midGreen} emissiveIntensity={0.28} />
+        <meshStandardMaterial color={accent} emissive={accent} emissiveIntensity={0.28} />
       </mesh>
       <CanvasLabel
-        text="PIER STATION"
+        text="MASSIVE STATION"
         position={[0, 3.15, 0.63]}
         width={Math.min(width - 0.55, 1.85)}
         height={0.11}
@@ -229,28 +329,30 @@ export default function PierChargerMesh({
       <mesh ref={ledRef} position={[Math.min(width / 2 - 0.28, 1.15), 3.15, 0.62]}>
         <sphereGeometry args={[0.05, 14, 14]} />
         <meshStandardMaterial
-          color={charging ? '#7dffb3' : online ? '#3ddc97' : '#4a6b5c'}
-          emissive={charging ? '#7dffb3' : online ? '#3ddc97' : '#000'}
+          color={charging ? '#ffb3bb' : online ? '#c02434' : '#6b7280'}
+          emissive={charging ? '#ffb3bb' : online ? '#c02434' : '#000'}
           emissiveIntensity={0.25}
         />
       </mesh>
 
-      {/* Touch-screen bezel + glass */}
-      <mesh position={[0, 2.15, 0.57]} castShadow>
-        <boxGeometry args={[1.78, 1.38, 0.06]} />
-        <meshStandardMaterial color="#030d09" metalness={0.45} roughness={0.3} />
+      {/* Touch-screen bezel + glass — large for visibility */}
+      <mesh position={[0, 2.2, 0.57]} castShadow>
+        <boxGeometry args={[2.05, 1.55, 0.06]} />
+        <meshStandardMaterial color="#12151a" metalness={0.45} roughness={0.3} />
       </mesh>
-      <mesh position={[0, 2.15, 0.595]}>
-        <boxGeometry args={[1.68, 1.28, 0.02]} />
-        <meshStandardMaterial color="#0a1f18" metalness={0.2} roughness={0.55} />
+      <mesh position={[0, 2.2, 0.595]}>
+        <boxGeometry args={[1.94, 1.44, 0.02]} />
+        <meshStandardMaterial color="#1a1012" metalness={0.2} roughness={0.55} />
       </mesh>
       <ChargerLcdScreen
         connector={active}
         connectors={connectors}
         connectionState={connectionState}
         cpId={cpId}
-        position={[0, 2.15, 0.62]}
-        size={[1.58, 1.18]}
+        identity={identity}
+        firmwareStatus={firmwareStatus}
+        position={[0, 2.2, 0.62]}
+        size={[1.84, 1.34]}
         page={page}
         busy={busy}
         onPageChange={setPage}
@@ -262,28 +364,28 @@ export default function PierChargerMesh({
       />
       <CanvasLabel
         text="TOUCH SCREEN"
-        position={[0, 1.48, 0.61]}
+        position={[0, 1.45, 0.63]}
         width={0.55}
         height={0.05}
         fontSize={28}
         color="#5a7a6a"
       />
 
-      {/* Physical backup keys (aligned, readable) */}
-      <group position={[0, 1.22, 0.6]}>
+      {/* Physical keys — equal size, all readable */}
+      <group position={[0, 1.18, 0.64]}>
         <SoftKey
-          position={[-0.7, 0, 0]}
-          w={0.34}
-          h={0.15}
+          position={[-0.72, 0, 0]}
+          w={0.42}
+          h={0.2}
           label={active?.cablePlugged ? 'UNPLUG' : 'PLUG'}
           color="#eef6f2"
           disabled={busy}
           onClick={() => onOutletPlug?.(active?.number, !active?.cablePlugged)}
         />
         <SoftKey
-          position={[-0.28, 0, 0]}
-          w={0.34}
-          h={0.15}
+          position={[-0.24, 0, 0]}
+          w={0.42}
+          h={0.2}
           label="START"
           color="#b6f0d2"
           accent
@@ -291,65 +393,48 @@ export default function PierChargerMesh({
           onClick={() => onStart?.(active?.number)}
         />
         <SoftKey
-          position={[0.14, 0, 0]}
-          w={0.34}
-          h={0.15}
+          position={[0.24, 0, 0]}
+          w={0.42}
+          h={0.2}
           label="STOP"
           color="#e8eef2"
           disabled={busy || !isTx}
           onClick={() => onStop?.(active?.number)}
         />
         <SoftKey
-          position={[0.56, 0, 0]}
-          w={0.34}
-          h={0.15}
-          label="RFID"
-          color="#d4fff0"
-          accent
-          disabled={busy}
-          onClick={() => onTapCard?.(active?.number)}
+          position={[0.72, 0, 0]}
+          w={0.42}
+          h={0.2}
+          label="CLEAR"
+          color="#ffe8a8"
+          disabled={busy || active?.status !== 'Faulted'}
+          onClick={() => onClearFault?.(active?.number)}
         />
       </group>
 
-      {/* RFID reader plate */}
-      <mesh
-        position={[-0.45, 0.88, 0.6]}
-        onClick={(e) => {
-          e.stopPropagation();
-          onTapCard?.(active?.number);
-        }}
-      >
-        <boxGeometry args={[0.7, 0.26, 0.05]} />
-        <meshStandardMaterial color={deepGreen} emissive="#1a5c3a" emissiveIntensity={0.28} metalness={0.3} roughness={0.45} />
-      </mesh>
-      <CanvasLabel text="TAP RFID / NFC" position={[-0.45, 0.88, 0.64]} width={0.62} height={0.07} fontSize={36} color="#7dffb3" />
-
-      <SoftKey
-        position={[0.45, 0.88, 0.6]}
-        w={0.42}
-        h={0.16}
-        label="CLEAR"
-        color="#ffe8a8"
-        disabled={busy || active?.status !== 'Faulted'}
-        onClick={() => onClearFault?.(active?.number)}
+      {/* Dedicated large RFID pad — clear of keys and holsters */}
+      <RfidPad
+        position={[0, 0.82, 0.64]}
+        disabled={busy}
+        onClick={() => onTapCard?.(active?.number)}
       />
 
       {/* E-stop + active status */}
       <MushroomStop
-        position={[width / 2 - 0.42, 0.52, 0.62]}
+        position={[width / 2 - 0.42, 0.38, 0.64]}
         disabled={busy || !isTx}
         onClick={() => onEmergency?.(active?.number)}
       />
       <CanvasLabel
         text={`C${active?.number || 1} · ${active?.status || ''}`}
-        position={[-width / 2 + 0.65, 0.52, 0.6]}
+        position={[-width / 2 + 0.65, 0.38, 0.64]}
         width={0.7}
         height={0.07}
         fontSize={32}
-        color="#a8e6cf"
+        color="#e8a3aa"
       />
 
-      {/* Holsters */}
+      {/* Holsters lower so they don't cover RFID */}
       {guns.map((c, idx) => {
         const spread =
           count === 1 ? 0 : (idx - (count - 1) / 2) * Math.min(0.75, (width - 1.0) / Math.max(count - 1, 1));
@@ -358,10 +443,10 @@ export default function PierChargerMesh({
         const plugged = !!c.cablePlugged;
         const isCharging = c.status === 'Charging';
         return (
-          <group key={c.number} position={[spread, 0.42, 0.72]}>
-            <mesh position={[0, 0.16, -0.08]} castShadow>
-              <boxGeometry args={[0.34, 0.48, 0.2]} />
-              <meshStandardMaterial color={midGreen} metalness={0.4} roughness={0.4} />
+          <group key={c.number} position={[spread, 0.22, 0.72]}>
+            <mesh position={[0, 0.14, -0.08]} castShadow>
+              <boxGeometry args={[0.34, 0.42, 0.2]} />
+              <meshStandardMaterial color={accent} metalness={0.4} roughness={0.4} />
             </mesh>
             <mesh
               castShadow
@@ -380,21 +465,21 @@ export default function PierChargerMesh({
                 onOutletPlug?.(c.number, !plugged);
               }}
             >
-              <cylinderGeometry args={[0.1, 0.115, 0.34, 18]} />
+              <cylinderGeometry args={[0.1, 0.115, 0.3, 18]} />
               <meshStandardMaterial
-                color={focused ? white : selected ? '#a8e6cf' : '#1a4a3a'}
-                emissive={isCharging ? '#7dffb3' : selected ? '#2a6b48' : '#000'}
+                color={focused ? white : selected ? '#e8a3aa' : '#3a1f24'}
+                emissive={isCharging ? '#ffb3bb' : selected ? '#c02434' : '#000'}
                 emissiveIntensity={isCharging ? 0.6 : selected ? 0.28 : 0}
                 metalness={0.65}
                 roughness={0.25}
               />
             </mesh>
-            <mesh position={[0, -0.26, 0.08]} rotation={[1.1, 0, 0]}>
-              <cylinderGeometry args={[0.04, 0.045, 0.26, 12]} />
-              <meshStandardMaterial color={plugged ? '#7dffb3' : silver} metalness={0.55} />
+            <mesh position={[0, -0.22, 0.08]} rotation={[1.1, 0, 0]}>
+              <cylinderGeometry args={[0.04, 0.045, 0.22, 12]} />
+              <meshStandardMaterial color={plugged ? '#ffb3bb' : silver} metalness={0.55} />
             </mesh>
-            <CanvasLabel text={`C${c.number}`} position={[0, -0.45, 0.12]} width={0.2} height={0.05} fontSize={40} color={white} />
-            <CanvasLabel text={`${c.powerKw} kW`} position={[0, -0.53, 0.12]} width={0.24} height={0.04} fontSize={28} color="#a8e6cf" />
+            <CanvasLabel text={`C${c.number}`} position={[0, -0.4, 0.12]} width={0.2} height={0.05} fontSize={40} color={white} />
+            <CanvasLabel text={`${c.powerKw} kW`} position={[0, -0.48, 0.12]} width={0.24} height={0.04} fontSize={28} color="#e8a3aa" />
           </group>
         );
       })}
@@ -405,7 +490,7 @@ export default function PierChargerMesh({
         return (
           <mesh key={i} position={[x, 3.3, 0.05]}>
             <boxGeometry args={[0.16, 0.06, 0.7]} />
-            <meshStandardMaterial color={deepGreen} />
+            <meshStandardMaterial color={deep} />
           </mesh>
         );
       })}
