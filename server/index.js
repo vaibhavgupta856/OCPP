@@ -248,13 +248,15 @@ io.on('connection', (socket) => {
 if (isProd) {
   const dist = path.join(ROOT, 'client', 'dist');
   app.use(express.static(dist));
-  app.get('*', (_req, res) => {
+  // SPA fallback — API + Socket.IO routes are registered above and take precedence
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path.startsWith('/socket.io')) return next();
     res.sendFile(path.join(dist, 'index.html'));
   });
 }
 
-server.listen(PORT, () => {
-  console.log(`Massive Mobility Charging Simulator API on http://localhost:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Massive Mobility Charging Simulator on http://0.0.0.0:${PORT} (${isProd ? 'production' : 'dev'})`);
   if (!isProd) {
     console.log('Vite client: run `npm run client` (proxies API to this port)');
   }

@@ -4,6 +4,9 @@
   "description": "Massive Mobility Charging Simulator — OCPP 1.6 Charge Point console",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "concurrently -n server,client -c cyan,amber \"npm run server\" \"npm run client\"",
     "server": "node server/index.js",

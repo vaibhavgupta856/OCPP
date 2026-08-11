@@ -1,0 +1,17 @@
+# Render Blueprint — Massive Mobility OCPP 1.6 Simulator
+# https://render.com/docs/blueprint-spec
+# Deploy: https://dashboard.render.com/select-repo?type=blueprint
+# Or one-click: https://render.com/deploy?repo=https://github.com/vaibhavgupta856/OCPP
+
+services:
+  - type: web
+    name: massive-ocpp-simulator
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm run install:all && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
