@@ -3,6 +3,7 @@
  */
 
 import { ConnectorStatus, transition } from '../fsm.js';
+import { normalizeSetChargingProfilePayload } from '../smartCharging.js';
 
 export async function handleRemoteStartTransaction(cp, payload) {
   const idTag = payload.idTag;
@@ -471,11 +472,12 @@ export async function handleGetDiagnostics(cp, payload) {
 }
 
 export async function handleSetChargingProfile(cp, payload) {
-  const connectorId = payload.connectorId;
-  if (typeof connectorId !== 'number') {
+  const normalized = normalizeSetChargingProfilePayload(payload || {});
+  if (normalized.reason && normalized.profile == null) {
+    cp.log('warn', `SetChargingProfile Rejected: ${normalized.reason}`);
     return { status: 'Rejected' };
   }
-  return cp.setChargingProfile(connectorId, payload.csChargingProfiles);
+  return cp.setChargingProfile(normalized.connectorId, normalized.profile);
 }
 
 export async function handleClearChargingProfile(cp, payload = {}) {

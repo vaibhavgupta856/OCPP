@@ -16,6 +16,124 @@ function parseIsoMs(value) {
   return Number.isFinite(t) ? t : null;
 }
 
+function toNumber(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+/**
+ * Massive CMS often flattens SetChargingProfile fields. Rebuild OCPP shape.
+ * Returns { connectorId, profile, reason? } or { reason } on hard failure.
+ */
+export function normalizeSetChargingProfilePayload(payload = {}) {
+  const connectorId = toNumber(payload.connectorId);
+  if (connectorId == null) {
+    return { reason: 'connectorId missing or not a number' };
+  }
+
+  let raw = payload.csChargingProfiles;
+  if (!raw || typeof raw !== 'object') {
+    // Flat CMS form: profile fields at top level next to connectorId
+    const {
+      connectorId: _c,
+      csChargingProfiles: _cs,
+      ...rest
+    } = payload;
+    if (rest.chargingProfileId != null || rest.chargingProfilePurpose != null) {
+      raw = rest;
+    }
+  }
+  if (!raw || typeof raw !== 'object') {
+    return { reason: 'csChargingProfiles missing' };
+  }
+
+  const profile = clone(raw);
+
+  const chargingProfileId = toNumber(profile.chargingProfileId);
+  const stackLevel = toNumber(profile.stackLevel);
+  if (chargingProfileId != null) profile.chargingProfileId = chargingProfileId;
+  if (stackLevel != null) profile.stackLevel = stackLevel;
+  if (profile.transactionId != null) {
+    const tx = toNumber(profile.transactionId);
+    if (tx != null) profile.transactionId = tx;
+  }
+
+  // Nest schedule if CMS sent schedule fields on the profile root
+  let schedule = profile.chargingSchedule;
+  if (!schedule || typeof schedule !== 'object') {
+    const periods = profile.chargingSchedulePeriod;
+    const unit = profile.chargingRateUnit;
+    if (periods || unit) {
+      schedule = {
+        chargingRateUnit: unit,
+        chargingSchedulePeriod: periods,
+      };
+      if (profile.duration != null) schedule.duration = toNumber(profile.duration) ?? profile.duration;
+      if (profile.startSchedule != null) schedule.startSchedule = profile.startSchedule;
+      if (profile.startScheduleDate != null && !schedule.startSchedule) {
+        schedule.startSchedule = profile.startScheduleDate;
+      }
+      if (profile.minChargingRate != null) {
+        schedule.minChargingRate = toNumber(profile.minChargingRate) ?? profile.minChargingRate;
+      }
+      delete profile.chargingSchedulePeriod;
+      delete profile.chargingRateUnit;
+      delete profile.duration;
+      delete profile.startSchedule;
+      delete profile.startScheduleDate;
+      delete profile.minChargingRate;
+      // Drop empty CMS date placeholders
+      delete profile.validFromDate;
+      delete profile.validToDate;
+      profile.chargingSchedule = schedule;
+    }
+  } else {
+    schedule = clone(schedule);
+    if (schedule.duration != null) schedule.duration = toNumber(schedule.duration) ?? schedule.duration;
+    if (schedule.minChargingRate != null) {
+      schedule.minChargingRate = toNumber(schedule.minChargingRate) ?? schedule.minChargingRate;
+    }
+    profile.chargingSchedule = schedule;
+  }
+
+  // Map placeholder / alternate date fields
+  if (!profile.validFrom && profile.validFromDate) profile.validFrom = profile.validFromDate;
+  if (!profile.validTo && profile.validToDate) profile.validTo = profile.validToDate;
+  delete profile.validFromDate;
+  delete profile.validToDate;
+
+  // Empty strings from CMS date pickers → omit
+  for (const key of ['validFrom', 'validTo', 'recurrencyKind']) {
+    if (profile[key] === '' || profile[key] == null) delete profile[key];
+  }
+  if (profile.chargingSchedule) {
+    const s = profile.chargingSchedule;
+    if (s.startSchedule === '' || s.startSchedule == null) delete s.startSchedule;
+    if (typeof s.startSchedule === 'string' && /dd-mm-yyyy/i.test(s.startSchedule)) {
+      delete s.startSchedule;
+    }
+    if (Array.isArray(s.chargingSchedulePeriod)) {
+      s.chargingSchedulePeriod = s.chargingSchedulePeriod.map((p) => ({
+        ...p,
+        startPeriod: toNumber(p.startPeriod) ?? p.startPeriod,
+        limit: toNumber(p.limit) ?? p.limit,
+        numberPhases: p.numberPhases != null ? toNumber(p.numberPhases) ?? p.numberPhases : undefined,
+      }));
+    }
+  }
+  for (const key of ['validFrom', 'validTo']) {
+    if (typeof profile[key] === 'string' && /dd-mm-yyyy/i.test(profile[key])) {
+      delete profile[key];
+    }
+  }
+
+  return { connectorId, profile };
+}
+
 /**
  * @typedef {{ connectorId: number, profile: object }} StoredProfile
  */
@@ -58,11 +176,11 @@ export class SmartChargingStore {
   }
 
   /**
-   * Validate + install. Returns OCPP status string.
+   * Validate + install. Returns { status, reason? }.
    */
   setProfile(connectorId, csChargingProfiles, { hasTransaction, transactionId } = {}) {
     if (!csChargingProfiles || typeof csChargingProfiles !== 'object') {
-      return 'Rejected';
+      return { status: 'Rejected', reason: 'csChargingProfiles missing' };
     }
 
     const profile = clone(csChargingProfiles);
@@ -70,40 +188,67 @@ export class SmartChargingStore {
     const kind = profile.chargingProfileKind;
     const schedule = profile.chargingSchedule;
 
-    if (!PURPOSES.has(purpose) || !KINDS.has(kind)) return 'Rejected';
-    if (typeof profile.chargingProfileId !== 'number') return 'Rejected';
-    if (typeof profile.stackLevel !== 'number' || profile.stackLevel < 0) return 'Rejected';
-    if (profile.stackLevel > this.maxStackLevel) return 'Rejected';
-    if (!schedule || !RATE_UNITS.has(schedule.chargingRateUnit)) return 'Rejected';
-    if (!Array.isArray(schedule.chargingSchedulePeriod) || schedule.chargingSchedulePeriod.length === 0) {
-      return 'Rejected';
+    if (!PURPOSES.has(purpose) || !KINDS.has(kind)) {
+      return { status: 'Rejected', reason: `invalid purpose/kind (${purpose}/${kind})` };
     }
-    if (schedule.chargingSchedulePeriod.length > this.maxPeriods) return 'Rejected';
+    if (typeof profile.chargingProfileId !== 'number') {
+      return { status: 'Rejected', reason: 'chargingProfileId must be a number' };
+    }
+    if (typeof profile.stackLevel !== 'number' || profile.stackLevel < 0) {
+      return { status: 'Rejected', reason: 'stackLevel must be a non-negative number' };
+    }
+    if (profile.stackLevel > this.maxStackLevel) {
+      return { status: 'Rejected', reason: `stackLevel > ChargeProfileMaxStackLevel (${this.maxStackLevel})` };
+    }
+    if (!schedule || !RATE_UNITS.has(schedule.chargingRateUnit)) {
+      return { status: 'Rejected', reason: 'chargingSchedule.chargingRateUnit must be A or W' };
+    }
+    if (!Array.isArray(schedule.chargingSchedulePeriod) || schedule.chargingSchedulePeriod.length === 0) {
+      return { status: 'Rejected', reason: 'chargingSchedulePeriod required' };
+    }
+    if (schedule.chargingSchedulePeriod.length > this.maxPeriods) {
+      return { status: 'Rejected', reason: 'too many chargingSchedulePeriod entries' };
+    }
 
     const unitOk =
       (schedule.chargingRateUnit === 'W' && this.allowedRateUnits.some((u) => /power/i.test(u))) ||
       (schedule.chargingRateUnit === 'A' && this.allowedRateUnits.some((u) => /current/i.test(u)));
-    if (!unitOk) return 'Rejected';
+    if (!unitOk) {
+      return { status: 'Rejected', reason: `rate unit ${schedule.chargingRateUnit} not allowed` };
+    }
 
     for (const period of schedule.chargingSchedulePeriod) {
-      if (typeof period.startPeriod !== 'number' || period.startPeriod < 0) return 'Rejected';
-      if (typeof period.limit !== 'number' || period.limit < 0) return 'Rejected';
+      if (typeof period.startPeriod !== 'number' || period.startPeriod < 0) {
+        return { status: 'Rejected', reason: 'period.startPeriod invalid' };
+      }
+      if (typeof period.limit !== 'number' || period.limit < 0) {
+        return { status: 'Rejected', reason: 'period.limit invalid' };
+      }
     }
 
     // Spec: ChargePointMaxProfile only on connector 0
     if (purpose === 'ChargePointMaxProfile' && connectorId !== 0) {
-      return 'Rejected';
+      return { status: 'Rejected', reason: 'ChargePointMaxProfile only allowed on connectorId 0' };
     }
 
     // Spec: TxProfile only while a transaction is active on that connector
     if (purpose === 'TxProfile') {
-      if (connectorId === 0 || !hasTransaction) return 'Rejected';
+      if (connectorId === 0) {
+        return { status: 'Rejected', reason: 'TxProfile not allowed on connectorId 0' };
+      }
+      if (!hasTransaction) {
+        return {
+          status: 'Rejected',
+          reason:
+            'TxProfile requires an active transaction on this connector — start charging first, or use TxDefaultProfile',
+        };
+      }
       if (
         profile.transactionId != null &&
         transactionId != null &&
         Number(profile.transactionId) !== Number(transactionId)
       ) {
-        return 'Rejected';
+        return { status: 'Rejected', reason: 'transactionId does not match active transaction' };
       }
       if (profile.transactionId == null && transactionId != null) {
         profile.transactionId = transactionId;
@@ -124,11 +269,11 @@ export class SmartChargingStore {
     );
 
     if (this.profiles.length >= this.maxProfiles) {
-      return 'Rejected';
+      return { status: 'Rejected', reason: 'MaxChargingProfilesInstalled reached' };
     }
 
     this.profiles.push({ connectorId, profile });
-    return 'Accepted';
+    return { status: 'Accepted' };
   }
 
   clearProfiles(filters = {}) {

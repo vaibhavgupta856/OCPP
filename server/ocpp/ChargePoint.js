@@ -676,13 +676,16 @@ export class ChargePoint {
     this.smartCharging.configureFromConfig(this.config);
     const connector = this.getConnector(connectorId);
     if (connectorId !== 0 && !connector) {
+      this.log('warn', `SetChargingProfile Rejected — unknown connector ${connectorId}`);
       return { status: 'Rejected' };
     }
 
-    const status = this.smartCharging.setProfile(connectorId, csChargingProfiles, {
+    const result = this.smartCharging.setProfile(connectorId, csChargingProfiles, {
       hasTransaction: !!(connector && connector.transactionId),
       transactionId: connector?.transactionId ?? null,
     });
+    const status = typeof result === 'string' ? result : result.status;
+    const reason = typeof result === 'object' ? result.reason : null;
 
     if (status === 'Accepted') {
       this.log(
@@ -696,6 +699,11 @@ export class ChargePoint {
         connectorId,
         profileId: csChargingProfiles?.chargingProfileId,
       });
+    } else {
+      this.log(
+        'warn',
+        `SetChargingProfile Rejected${reason ? `: ${reason}` : ''} (purpose=${csChargingProfiles?.chargingProfilePurpose}, connector=${connectorId}, tx=${connector?.transactionId ?? 'none'})`
+      );
     }
     return { status };
   }
