@@ -1084,7 +1084,7 @@ export default function MassiveChargerMesh({
           hardware={hardware}
           tariff={tariff}
           position={[0, 0, 0.02]}
-          size={[1.6, 1.2]}
+          size={[1.75, 1.32]}
           page={page}
           busy={busy}
           showButtons={false}
