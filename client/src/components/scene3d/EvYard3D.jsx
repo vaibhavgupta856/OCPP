@@ -229,7 +229,7 @@ export default function EvYard3D(props) {
         <SceneContent {...props} />
       </Canvas>
       <div className="ev-yard-legend">
-        <span>Touch the HMI screen</span>
+        <span>Hover the HMI for a larger readout</span>
         <span>Guns on the sides · double-click to plug</span>
         <span>Drag orbit · scroll zoom</span>
         <span className="yard-state">

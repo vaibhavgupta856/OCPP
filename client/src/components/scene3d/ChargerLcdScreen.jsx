@@ -63,6 +63,12 @@ export default function ChargerLcdScreen({
   size = [1.55, 1.15],
   page = 'home',
   busy = false,
+  /** Soft keys + action row on the live HMI; preview panels omit them */
+  showButtons = true,
+  /** When false, mesh is display-only (no hit testing) */
+  interactive = true,
+  visible = true,
+  onHoverChange,
   onPageChange,
   onStart,
   onStop,
@@ -77,11 +83,13 @@ export default function ChargerLcdScreen({
   const hardwareRef = useRef(hardware);
   const fwStatusRef = useRef(firmwareStatus);
   const tariffRef = useRef(tariff);
+  const showButtonsRef = useRef(showButtons);
   pageRef.current = page;
   identityRef.current = identity;
   hardwareRef.current = hardware;
   fwStatusRef.current = firmwareStatus;
   tariffRef.current = tariff;
+  showButtonsRef.current = showButtons;
 
   const { texture, ctx, canvas } = useMemo(() => {
     const c = document.createElement('canvas');
@@ -154,8 +162,9 @@ export default function ChargerLcdScreen({
     ctx.textAlign = 'right';
     ctx.fillText(online ? 'ONLINE' : String(connectionState || 'OFFLINE').toUpperCase(), W - 48, 64);
 
+    const withButtons = showButtonsRef.current;
     const contentTop = 130;
-    const contentBottom = H - 240;
+    const contentBottom = withButtons ? H - 240 : H - 48;
 
     if (view === 'info') {
       const idn = identityRef.current || {};
@@ -229,7 +238,11 @@ export default function ChargerLcdScreen({
       ctx.fillText('Outlets', 48, contentTop + 48);
       ctx.fillStyle = '#e8a3aa';
       ctx.font = '28px system-ui, Segoe UI, sans-serif';
-      ctx.fillText('Tap a row to focus that connector', 48, contentTop + 96);
+      ctx.fillText(
+        withButtons ? 'Tap a row to focus that connector' : 'Connector status overview',
+        48,
+        contentTop + 96
+      );
       guns.forEach((g, i) => {
         const y = contentTop + 120 + i * 100;
         if (y + 86 > contentBottom) return;
@@ -308,7 +321,13 @@ export default function ChargerLcdScreen({
       ctx.fillText('Ready to charge', 48, contentTop + 52);
       ctx.fillStyle = '#f0d0d4';
       ctx.font = '32px system-ui, Segoe UI, sans-serif';
-      ctx.fillText('Use the touch buttons below · or the RFID pad', 48, contentTop + 110);
+      ctx.fillText(
+        withButtons
+          ? 'Use the touch buttons below · or the RFID pad'
+          : 'Outlet status and session meters',
+        48,
+        contentTop + 110
+      );
 
       ctx.fillStyle = '#3a1a22';
       roundRect(ctx, 48, contentTop + 150, W - 96, 140, 16);
@@ -348,61 +367,63 @@ export default function ChargerLcdScreen({
       ctx.fillText(`FW ${fw}`, 48, contentBottom - 10);
     }
 
-    // touch nav — only navigation (no duplicate physical page keys)
-    const navY = H - 220;
-    const nav = [
-      { id: 'home', label: 'HOME' },
-      { id: 'session', label: 'SESSION' },
-      { id: 'connectors', label: 'OUTLETS' },
-      { id: 'info', label: 'INFO' },
-    ];
-    const navGap = 14;
-    const navPad = 32;
-    const navW = (W - navPad * 2 - navGap * (nav.length - 1)) / nav.length;
-    nav.forEach((item, i) => {
-      const x = navPad + i * (navW + navGap);
-      const active = view === item.id;
-      drawBtn(ctx, x, navY, navW, 82, item.label, {
-        fill: active ? '#c02434' : '#9b1c2a',
-        text: '#ffffff',
-        active,
+    if (withButtons) {
+      // touch nav — only navigation (no duplicate physical page keys)
+      const navY = H - 220;
+      const nav = [
+        { id: 'home', label: 'HOME' },
+        { id: 'session', label: 'SESSION' },
+        { id: 'connectors', label: 'OUTLETS' },
+        { id: 'info', label: 'INFO' },
+      ];
+      const navGap = 14;
+      const navPad = 32;
+      const navW = (W - navPad * 2 - navGap * (nav.length - 1)) / nav.length;
+      nav.forEach((item, i) => {
+        const x = navPad + i * (navW + navGap);
+        const active = view === item.id;
+        drawBtn(ctx, x, navY, navW, 82, item.label, {
+          fill: active ? '#c02434' : '#9b1c2a',
+          text: '#ffffff',
+          active,
+        });
+        zones.push({ id: `page:${item.id}`, x: x - 4, y: navY - 4, w: navW + 8, h: 90 });
       });
-      zones.push({ id: `page:${item.id}`, x: x - 4, y: navY - 4, w: navW + 8, h: 90 });
-    });
 
-    // action touch row — PLUG / START / STOP / CLEAR (RFID is the physical pad only)
-    const actY = H - 118;
-    const actions = [
-      { id: 'plug', label: plugged ? 'UNPLUG' : 'PLUG', fill: '#6b3038', w: 280 },
-      { id: 'start', label: 'START', fill: '#c02434', disabled: busy || isTx, w: 280 },
-      { id: 'stop', label: 'STOP', fill: '#4b5563', disabled: busy || !isTx, w: 280 },
-      {
-        id: 'clear',
-        label: 'CLEAR',
-        fill: '#b45309',
-        disabled: busy || c?.status !== 'Faulted',
-        w: 280,
-      },
-    ];
-    let ax = 36;
-    const gap = (W - 72 - actions.reduce((s, a) => s + a.w, 0)) / (actions.length - 1);
-    actions.forEach((item) => {
-      const bw = item.w;
-      const disabled = !!item.disabled;
-      drawBtn(ctx, ax, actY, bw, 86, item.label, {
-        fill: disabled ? '#3f3f46' : item.fill,
-        text: disabled ? '#a1a1aa' : '#ffffff',
+      // action touch row — PLUG / START / STOP / CLEAR (RFID is the physical pad only)
+      const actY = H - 118;
+      const actions = [
+        { id: 'plug', label: plugged ? 'UNPLUG' : 'PLUG', fill: '#6b3038', w: 280 },
+        { id: 'start', label: 'START', fill: '#c02434', disabled: busy || isTx, w: 280 },
+        { id: 'stop', label: 'STOP', fill: '#4b5563', disabled: busy || !isTx, w: 280 },
+        {
+          id: 'clear',
+          label: 'CLEAR',
+          fill: '#b45309',
+          disabled: busy || c?.status !== 'Faulted',
+          w: 280,
+        },
+      ];
+      let ax = 36;
+      const gap = (W - 72 - actions.reduce((s, a) => s + a.w, 0)) / (actions.length - 1);
+      actions.forEach((item) => {
+        const bw = item.w;
+        const disabled = !!item.disabled;
+        drawBtn(ctx, ax, actY, bw, 86, item.label, {
+          fill: disabled ? '#3f3f46' : item.fill,
+          text: disabled ? '#a1a1aa' : '#ffffff',
+        });
+        if (!disabled) zones.push({ id: item.id, x: ax - 2, y: actY - 2, w: bw + 4, h: 90 });
+        ax += bw + gap;
       });
-      if (!disabled) zones.push({ id: item.id, x: ax - 2, y: actY - 2, w: bw + 4, h: 90 });
-      ax += bw + gap;
-    });
 
-    if (view === 'connectors') {
-      guns.forEach((g, i) => {
-        const y = contentTop + 120 + i * 100;
-        if (y + 86 > contentBottom) return;
-        zones.push({ id: `outlet:${g.number}`, x: 44, y: y - 2, w: W - 88, h: 92 });
-      });
+      if (view === 'connectors') {
+        guns.forEach((g, i) => {
+          const y = contentTop + 120 + i * 100;
+          if (y + 86 > contentBottom) return;
+          zones.push({ id: `outlet:${g.number}`, x: 44, y: y - 2, w: W - 88, h: 92 });
+        });
+      }
     }
 
     hitZonesRef.current = zones;
@@ -410,6 +431,7 @@ export default function ChargerLcdScreen({
   });
 
   const handleHit = (e) => {
+    if (!interactive || !showButtons) return;
     e.stopPropagation();
     const uv = e.uv;
     if (!uv) return;
@@ -440,17 +462,17 @@ export default function ChargerLcdScreen({
     <mesh
       ref={meshRef}
       position={position}
-      onPointerDown={handleHit}
-      onClick={handleHit}
+      visible={visible}
+      onPointerDown={interactive ? handleHit : undefined}
+      onClick={interactive ? handleHit : undefined}
       onPointerOver={(e) => {
         e.stopPropagation();
-        document.body.style.cursor = 'default';
-        if (e.target?.ownerDocument?.body) {
-          e.target.ownerDocument.body.style.cursor = 'default';
-        }
+        document.body.style.cursor = interactive ? 'pointer' : 'default';
+        onHoverChange?.(true);
       }}
       onPointerOut={() => {
         document.body.style.cursor = 'default';
+        onHoverChange?.(false);
       }}
     >
       <planeGeometry args={size} />

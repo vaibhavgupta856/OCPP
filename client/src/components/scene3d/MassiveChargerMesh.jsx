@@ -820,12 +820,33 @@ export default function MassiveChargerMesh({
 }) {
   const ledRef = useRef();
   const stripRef = useRef();
+  const peekHideTimer = useRef(null);
   const [page, setPage] = useState('home');
+  const [lcdPeek, setLcdPeek] = useState(false);
   const cabinet = '#2a2f36';
   const accent = '#c02434';
   const deep = '#14181e';
   const white = '#f2f4f7';
   const silver = '#c8d0d8';
+
+  const setLcdHover = (over) => {
+    if (peekHideTimer.current) {
+      clearTimeout(peekHideTimer.current);
+      peekHideTimer.current = null;
+    }
+    if (over) {
+      setLcdPeek(true);
+      return;
+    }
+    peekHideTimer.current = setTimeout(() => setLcdPeek(false), 180);
+  };
+
+  useEffect(
+    () => () => {
+      if (peekHideTimer.current) clearTimeout(peekHideTimer.current);
+    },
+    []
+  );
 
   const surfaces = useMemo(() => {
     const body = makeSurfaceMaps({ base: cabinet, style: 'brushed', size: 512 });
@@ -1042,6 +1063,7 @@ export default function MassiveChargerMesh({
         size={[0.92, 0.78]}
         page={page}
         busy={busy}
+        onHoverChange={setLcdHover}
         onPageChange={setPage}
         onStart={onStart}
         onStop={onStop}
@@ -1049,6 +1071,49 @@ export default function MassiveChargerMesh({
         onClearFault={onClearFault}
         onSelectOutlet={onSelectOutlet}
       />
+
+      {/* Larger display-only HMI clone — to the right, never covers the pedestal */}
+      <group visible={lcdPeek} position={[bodyW / 2 + 1.45, 2.35, bodyD / 2 - 0.05]}>
+        <mesh position={[0, 0, -0.04]} castShadow>
+          <boxGeometry args={[1.78, 1.42, 0.06]} />
+          <meshPhysicalMaterial
+            color="#0c0f14"
+            metalness={1}
+            roughness={0.1}
+            clearcoat={0.85}
+            envMapIntensity={1.6}
+          />
+        </mesh>
+        <mesh position={[0, 0.72, 0.01]}>
+          <planeGeometry args={[1.55, 0.12]} />
+          <meshBasicMaterial color="#1a1014" toneMapped={false} />
+        </mesh>
+        <CanvasLabel
+          text="HMI PREVIEW"
+          position={[0, 0.72, 0.02]}
+          width={0.7}
+          height={0.08}
+          fontSize={36}
+          color="#ffb3bb"
+        />
+        <ChargerLcdScreen
+          connector={active}
+          connectors={connectors}
+          connectionState={connectionState}
+          cpId={cpId}
+          identity={identity}
+          firmwareStatus={firmwareStatus}
+          hardware={hardware}
+          tariff={tariff}
+          position={[0, -0.04, 0.02]}
+          size={[1.62, 1.22]}
+          page={page}
+          busy={busy}
+          showButtons={false}
+          interactive={false}
+          onHoverChange={setLcdHover}
+        />
+      </group>
 
       {/* RFID pad only — page/action buttons live on the touch screen (no duplicates) */}
       <RfidPad
