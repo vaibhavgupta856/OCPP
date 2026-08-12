@@ -67,6 +67,10 @@ export default function ActionBar({
   const [connName, setConnName] = useState(`Connector ${connectorId}`);
   const [energyIn, setEnergyIn] = useState(12);
   const [battery, setBattery] = useState(60);
+  const [fillMode, setFillMode] = useState('full'); // full | energy | money | time
+  const [fillEnergy, setFillEnergy] = useState(10);
+  const [fillMoney, setFillMoney] = useState(200);
+  const [fillMinutes, setFillMinutes] = useState(30);
   const [rate, setRate] = useState(charger?.energyRatePerKwh ?? 18.5);
 
   const connector = charger?.connectors?.find((c) => c.number === connectorId);
@@ -76,6 +80,27 @@ export default function ActionBar({
   const inKwh = Math.max(0, Math.min(packKwh, Number(energyIn) || 0));
   const toFullKwh = Math.max(0, packKwh - inKwh);
   const socPct = (inKwh / packKwh) * 100;
+  const tariff = Math.max(0, Number(rate) || 0);
+  const plannedKwh =
+    fillMode === 'full'
+      ? toFullKwh
+      : fillMode === 'energy'
+        ? Math.min(toFullKwh, Math.max(0, Number(fillEnergy) || 0))
+        : fillMode === 'money'
+          ? tariff > 0
+            ? Math.min(toFullKwh, Math.max(0, Number(fillMoney) || 0) / tariff)
+            : 0
+          : Math.min(
+              toFullKwh,
+              Math.max(0, Number(connector?.powerKw) || 0) * (Math.max(0, Number(fillMinutes) || 0) / 60)
+            );
+  const plannedCost = plannedKwh * tariff;
+  const plannedMins =
+    fillMode === 'time'
+      ? Math.max(0, Number(fillMinutes) || 0)
+      : connector?.powerKw
+        ? Math.round((plannedKwh / Math.max(0.1, connector.powerKw)) * 60)
+        : null;
 
   useEffect(() => {
     if (connector?.powerKw != null) setPower(connector.powerKw);
@@ -281,9 +306,11 @@ export default function ActionBar({
             </button>
           </div>
         </label>
-        <label>
-          Car battery (kWh in car / capacity)
-          <div className="inline-apply">
+        <div className="car-config">
+          <p className="car-config-title">Car configuration</p>
+
+          <label>
+            1. Energy already in car (kWh)
             <input
               type="number"
               min="0"
@@ -291,8 +318,11 @@ export default function ActionBar({
               step="0.1"
               value={energyIn}
               onChange={(e) => setEnergyIn(e.target.value)}
-              title="Energy already in the car battery (kWh)"
             />
+          </label>
+
+          <label>
+            2. Car battery capacity (kWh)
             <input
               type="number"
               min="0.1"
@@ -300,20 +330,107 @@ export default function ActionBar({
               step="0.1"
               value={battery}
               onChange={(e) => setBattery(e.target.value)}
-              title="Full battery capacity (kWh)"
             />
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => onSoc(inKwh, packKwh)}
-            >
-              Set
-            </button>
-          </div>
+          </label>
+
+          <fieldset className="fill-goal">
+            <legend>3. How much to fill</legend>
+            <label className="fill-option">
+              <input
+                type="radio"
+                name={`fill-${connectorId}`}
+                checked={fillMode === 'full'}
+                onChange={() => setFillMode('full')}
+              />
+              <span>Full pack</span>
+              <span />
+            </label>
+            <label className="fill-option">
+              <input
+                type="radio"
+                name={`fill-${connectorId}`}
+                checked={fillMode === 'energy'}
+                onChange={() => setFillMode('energy')}
+              />
+              <span>By energy (kWh)</span>
+              <input
+                type="number"
+                min="0"
+                max="500"
+                step="0.1"
+                value={fillEnergy}
+                disabled={fillMode !== 'energy'}
+                onChange={(e) => setFillEnergy(e.target.value)}
+              />
+            </label>
+            <label className="fill-option">
+              <input
+                type="radio"
+                name={`fill-${connectorId}`}
+                checked={fillMode === 'money'}
+                onChange={() => setFillMode('money')}
+              />
+              <span>By money ({sym})</span>
+              <input
+                type="number"
+                min="0"
+                max="100000"
+                step="1"
+                value={fillMoney}
+                disabled={fillMode !== 'money'}
+                onChange={(e) => setFillMoney(e.target.value)}
+              />
+            </label>
+            <label className="fill-option">
+              <input
+                type="radio"
+                name={`fill-${connectorId}`}
+                checked={fillMode === 'time'}
+                onChange={() => setFillMode('time')}
+              />
+              <span>By time (minutes)</span>
+              <input
+                type="number"
+                min="1"
+                max="1440"
+                step="1"
+                value={fillMinutes}
+                disabled={fillMode !== 'time'}
+                onChange={(e) => setFillMinutes(e.target.value)}
+              />
+            </label>
+          </fieldset>
+
           <small className="hint">
-            SoC ~ {socPct.toFixed(0)}% · energy to full ~ {toFullKwh.toFixed(2)} kWh
+            SoC ~ {socPct.toFixed(0)}% · room left {toFullKwh.toFixed(2)} kWh
+            <br />
+            Will deliver ~ {plannedKwh.toFixed(2)} kWh · ~ {sym}
+            {plannedCost.toFixed(2)}
+            {fillMode === 'time'
+              ? ` · stop after ${plannedMins} min`
+              : plannedMins != null
+                ? ` · ~${plannedMins} min at ${connector?.powerKw ?? '—'} kW`
+                : ''}
           </small>
-        </label>
+
+          <button
+            type="button"
+            className="car-config-set"
+            disabled={busy}
+            onClick={() =>
+              onSoc({
+                energyKwh: inKwh,
+                batteryKwh: packKwh,
+                fillMode,
+                fillEnergyKwh: fillMode === 'energy' ? Number(fillEnergy) : undefined,
+                fillMoney: fillMode === 'money' ? Number(fillMoney) : undefined,
+                fillMinutes: fillMode === 'time' ? Number(fillMinutes) : undefined,
+              })
+            }
+          >
+            Set car config
+          </button>
+        </div>
       </section>
 
       <section className="ctrl-section">

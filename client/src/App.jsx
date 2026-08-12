@@ -248,8 +248,16 @@ export default function App() {
               onPower={(powerKw) =>
                 act('/power', { connectorId: activeConnector, powerKw })
               }
-              onSoc={(energyKwh, batteryKwh) =>
-                act('/soc', { connectorId: activeConnector, energyKwh, batteryKwh })
+              onSoc={(cfg) =>
+                act('/soc', {
+                  connectorId: activeConnector,
+                  energyKwh: cfg.energyKwh,
+                  batteryKwh: cfg.batteryKwh,
+                  fillMode: cfg.fillMode,
+                  fillEnergyKwh: cfg.fillEnergyKwh,
+                  fillMoney: cfg.fillMoney,
+                  fillMinutes: cfg.fillMinutes,
+                })
               }
               onReconnect={(requireSubprotocol) => act('/reconnect', { requireSubprotocol })}
               onReset={(type) => act('/reset', { type })}

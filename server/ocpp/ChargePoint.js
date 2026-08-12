@@ -185,6 +185,14 @@ export class ChargePoint {
           currentA: meter?.currentA ?? 0,
           voltageV: meter?.voltageV ?? 0,
           soc: meter?.soc ?? null,
+          energyInKwh: meter?.energyInKwh ?? null,
+          batteryKwh: meter?.batteryKwh ?? null,
+          fillMode: meter?.fillMode ?? 'full',
+          fillEnergyKwh: meter?.fillEnergyKwh ?? null,
+          fillMoney: meter?.fillMoney ?? null,
+          fillMinutes: meter?.fillMinutes ?? null,
+          plannedDeliverKwh: meter?.plannedDeliverKwh ?? null,
+          plannedCost: meter?.plannedCost ?? null,
           energyKwh: Number(energyKwh.toFixed(3)),
           sessionCost,
           lastSessionCost: c.lastSessionCost ?? null,
@@ -1554,6 +1562,16 @@ export class ChargePoint {
     }
     if (currency) this.currency = String(currency).slice(0, 8).toUpperCase();
     if (currencySymbol) this.currencySymbol = String(currencySymbol).slice(0, 4);
+    for (const meter of this.meters.values()) {
+      meter.setEnergyRate(this.energyRatePerKwh);
+      if (meter.fillMode === 'money') {
+        meter.setFillGoal({
+          mode: 'money',
+          money: meter.fillMoney,
+          energyRatePerKwh: this.energyRatePerKwh,
+        });
+      }
+    }
     this.broadcastState();
     return {
       energyRatePerKwh: this.energyRatePerKwh,
@@ -1616,10 +1634,16 @@ export class ChargePoint {
         if (snap.soc != null) c.soc = snap.soc;
         this.broadcastState();
 
-        // EV pack full → stop the session (energy delivered ≈ remaining headroom)
-        if (snap.full && c.transactionId && c.status === ConnectorStatus.Charging) {
+        // EV pack full or fill goal reached → stop the session
+        if (
+          (snap.full || snap.limitReached) &&
+          c.transactionId &&
+          c.status === ConnectorStatus.Charging
+        ) {
+          const why = snap.full ? 'full pack' : `fill goal (${snap.limitReason})`;
+          this.log('info', `Auto-stop: ${why}`, { connectorId });
           this.endTransaction(connectorId, 'Local').catch((err) =>
-            this.log('warn', `Auto-stop on full SoC failed: ${err.message}`, { connectorId })
+            this.log('warn', `Auto-stop failed: ${err.message}`, { connectorId })
           );
           return;
         }
@@ -1776,7 +1800,10 @@ export class ChargePoint {
     this.broadcastState();
   }
 
-  updateSocSettings(connectorId, { soc, batteryKwh, energyKwh } = {}) {
+  updateSocSettings(
+    connectorId,
+    { soc, batteryKwh, energyKwh, fillMode, fillEnergyKwh, fillMoney, fillMinutes } = {}
+  ) {
     const meter = this.meters.get(connectorId);
     if (!meter) return;
     if (batteryKwh !== undefined) meter.setBatteryKwh(batteryKwh);
@@ -1785,11 +1812,22 @@ export class ChargePoint {
     } else if (soc !== undefined) {
       meter.setSoc(soc);
     }
+    meter.setEnergyRate(this.energyRatePerKwh);
+    if (fillMode != null || fillEnergyKwh != null || fillMoney != null || fillMinutes != null) {
+      const mode = fillMode || meter.fillMode || 'full';
+      meter.setFillGoal({
+        mode,
+        energyKwh: mode === 'energy' ? fillEnergyKwh : null,
+        money: mode === 'money' ? fillMoney : null,
+        minutes: mode === 'time' ? fillMinutes : null,
+        energyRatePerKwh: this.energyRatePerKwh,
+      });
+    }
     const c = this.getConnector(connectorId);
     if (c && meter.soc != null) c.soc = meter.soc;
     this.log(
       'info',
-      `Battery set: SoC ${meter.soc.toFixed(1)}% · pack ${meter.batteryKwh} kWh · to full ${meter.remainingKwh().toFixed(3)} kWh`,
+      `Car config: in=${((meter.soc / 100) * meter.batteryKwh).toFixed(2)} kWh · pack=${meter.batteryKwh} kWh · fill=${meter.fillMode} · plan≈${meter.plannedDeliverKwh().toFixed(3)} kWh / ${this.currencySymbol}${meter.plannedCost().toFixed(2)}`,
       { connectorId }
     );
     this.broadcastState();

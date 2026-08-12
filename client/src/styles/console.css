@@ -1265,6 +1265,57 @@
   font-size: 0.72rem;
   color: var(--ink-muted, #6b7280);
 }
+.car-config {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 0.35rem;
+  padding: 0.65rem 0.7rem;
+  border: 1px solid var(--steel, #d7dde5);
+  border-radius: 10px;
+  background: #fafbfc;
+}
+.car-config-title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #4b5563;
+}
+.car-config label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.78rem;
+}
+.fill-goal {
+  margin: 0;
+  padding: 0.5rem 0.55rem 0.35rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+.fill-goal legend {
+  padding: 0 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #374151;
+}
+.fill-option {
+  display: grid !important;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.35rem;
+  font-size: 0.78rem;
+}
+.fill-option input[type='number'] {
+  width: 5.5rem;
+  justify-self: end;
+}
+.car-config-set {
+  align-self: flex-start;
+}
 .link-error {
   color: var(--signal-red);
   font-size: 0.72rem;
