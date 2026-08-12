@@ -1073,7 +1073,7 @@ export default function MassiveChargerMesh({
       />
 
       {/* Larger display-only HMI clone — beside cabinet, slightly above mid */}
-      <group visible={lcdPeek} position={[bodyW / 2 + 1.65, 2.05, bodyD / 2 + 0.05]}>
+      <group visible={lcdPeek} position={[bodyW / 2 + 1.65, 2.2, bodyD / 2 + 0.05]}>
         <ChargerLcdScreen
           connector={active}
           connectors={connectors}

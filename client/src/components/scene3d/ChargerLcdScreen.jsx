@@ -46,6 +46,18 @@ function formatUptime(sec) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`;
 }
 
+/** Truncate canvas text so it fits within maxWidth (adds … when clipped). */
+function fitText(ctx, text, maxWidth) {
+  const raw = String(text || '');
+  if (!raw || maxWidth <= 0) return '';
+  if (ctx.measureText(raw).width <= maxWidth) return raw;
+  let t = raw;
+  while (t.length > 1 && ctx.measureText(`${t}…`).width > maxWidth) {
+    t = t.slice(0, -1);
+  }
+  return t.length < raw.length ? `${t}…` : t;
+}
+
 /**
  * Touch-screen HMI for the charge point — pages + on-screen soft keys only
  * (no duplicate physical buttons on the cabinet face).
@@ -180,24 +192,42 @@ export default function ChargerLcdScreen({
       ctx.strokeRect(12, 12, W - 24, H - 24);
     }
 
-    // top status bar
+    // top status bar — two rows so title / cpId / status never collide
+    const barX = 24;
+    const barY = 24;
+    const barH = 136;
+    const barPadX = 28;
+    const barInnerL = barX + barPadX;
+    const barInnerR = W - 56;
     ctx.fillStyle = '#2a1218';
-    ctx.fillRect(24, 24, W - 48, 120);
-    ctx.fillStyle = '#ffb3bb';
-    ctx.font = 'bold 68px system-ui, Segoe UI, sans-serif';
+    ctx.fillRect(barX, barY, W - 48, barH);
+
+    const statusLabel = online
+      ? 'ONLINE'
+      : String(connectionState || 'OFFLINE').toUpperCase();
+    ctx.font = 'bold 40px system-ui, Segoe UI, sans-serif';
+    const statusW = ctx.measureText(statusLabel).width;
+    const statusGap = 24;
+    const titleMaxW = barInnerR - barInnerL - statusW - statusGap;
+
+    const titleFull = withButtons ? 'MASSIVE CHARGE POINT' : 'MASSIVE CP';
+    ctx.font = 'bold 56px system-ui, Segoe UI, sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillText('MASSIVE CHARGE POINT', 52, 84);
-    ctx.font = '42px monospace';
-    ctx.fillStyle = '#e8a3aa';
-    const id = String(cpId || 'CP');
-    ctx.fillText(id.length > 18 ? `${id.slice(0, 16)}…` : id, 700, 84);
-    ctx.font = 'bold 44px system-ui, Segoe UI, sans-serif';
+    ctx.fillStyle = '#ffb3bb';
+    ctx.fillText(fitText(ctx, titleFull, titleMaxW), barInnerL, barY + 46);
+
+    ctx.font = 'bold 40px system-ui, Segoe UI, sans-serif';
     ctx.fillStyle = online ? '#ffb3bb' : '#ffb74d';
     ctx.textAlign = 'right';
-    ctx.fillText(online ? 'ONLINE' : String(connectionState || 'OFFLINE').toUpperCase(), W - 56, 84);
+    ctx.fillText(statusLabel, barInnerR, barY + 46);
 
-    const contentTop = 168;
+    ctx.font = '36px monospace';
+    ctx.fillStyle = '#e8a3aa';
+    ctx.textAlign = 'left';
+    ctx.fillText(fitText(ctx, String(cpId || 'CP'), barInnerR - barInnerL), barInnerL, barY + 100);
+
+    const contentTop = barY + barH + 20;
     const contentBottom = withButtons ? H - 280 : H - 56;
 
     if (view === 'info') {
