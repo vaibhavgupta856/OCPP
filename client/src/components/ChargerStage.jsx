@@ -1,19 +1,7 @@
-import { lazy, Suspense, useMemo } from 'react';
-
-const EvYard3D = lazy(() => import('./scene3d/EvYard3D.jsx'));
+import { useMemo } from 'react';
+import EvYard3D from './scene3d/EvYard3D.jsx';
 
 const DEFAULT_TAG = 'CARD-7F2A91';
-
-function YardFallback() {
-  return (
-    <div className="ev-yard-3d roomy yard-loading">
-      <div className="yard-loading-card">
-        <div className="yard-loading-spinner" />
-        <p>Loading charger view…</p>
-      </div>
-    </div>
-  );
-}
 
 export default function ChargerStage({
   charger,
@@ -103,8 +91,7 @@ export default function ChargerStage({
             : `CMS ${charger.connectionState} — operator options unlock when status is online.`}
         </div>
       )}
-      <Suspense fallback={<YardFallback />}>
-        <EvYard3D
+      <EvYard3D
           connectors={charger.connectors}
           activeConnector={activeConnector}
           selectedConnectors={selected}
@@ -156,7 +143,6 @@ export default function ChargerStage({
             onStart(n, t);
           }}
         />
-      </Suspense>
 
       {controlsEnabled ? (
       <section className="cp-2d-panel" aria-label="Charge point controls">

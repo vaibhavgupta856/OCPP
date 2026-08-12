@@ -163,8 +163,13 @@
   font-weight: 600;
   text-align: center;
 }
+.charger-stage.controls-locked {
+  min-height: calc(100vh - 140px);
+}
 .charger-stage.controls-locked .ev-yard-3d.roomy {
-  /* keep tall preview yard even without operator panel */
+  flex: 1 1 auto;
+  height: min(78vh, 820px);
+  min-height: 560px;
 }
 
 .ev-yard-3d.roomy {
