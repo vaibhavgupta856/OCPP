@@ -1073,7 +1073,7 @@ export default function MassiveChargerMesh({
       />
 
       {/* Larger display-only HMI clone — to the right, no frame/border */}
-      <group visible={lcdPeek} position={[bodyW / 2 + 1.55, 2.4, bodyD / 2 - 0.05]}>
+      <group visible={lcdPeek} position={[bodyW / 2 + 1.55, 1.95, bodyD / 2 - 0.05]}>
         <ChargerLcdScreen
           connector={active}
           connectors={connectors}
@@ -1104,7 +1104,7 @@ export default function MassiveChargerMesh({
 
       {/* Brand kick plate */}
       <mesh position={[0, 0.55, bodyD / 2 + 0.055]} castShadow>
-        <boxGeometry args={[bodyW - 0.2, 0.28, 0.04]} />
+        <boxGeometry args={[bodyW - 0.12, 0.4, 0.04]} />
         <meshPhysicalMaterial
           map={surfaces.accentMap.map}
           color={accent}
@@ -1116,18 +1116,18 @@ export default function MassiveChargerMesh({
       </mesh>
       <CanvasLabel
         text="EV CHARGER"
-        position={[0, 0.55, bodyD / 2 + 0.085]}
-        width={0.55}
-        height={0.08}
-        fontSize={40}
+        position={[0, 0.55, bodyD / 2 + 0.09]}
+        width={bodyW - 0.28}
+        height={0.22}
+        fontSize={92}
         color="#ffffff"
       />
       <CanvasLabel
         text={`C${active?.number || 1} · ${active?.status || ''}`}
-        position={[0, 0.35, bodyD / 2 + 0.085]}
-        width={0.7}
-        height={0.06}
-        fontSize={28}
+        position={[0, 0.28, bodyD / 2 + 0.085]}
+        width={0.85}
+        height={0.08}
+        fontSize={36}
         color="#e8a3aa"
       />
 

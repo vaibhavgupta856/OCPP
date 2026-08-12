@@ -16,8 +16,8 @@ export default function CanvasLabel({
 }) {
   const texture = useMemo(() => {
     const c = document.createElement('canvas');
-    c.width = 512;
-    c.height = 128;
+    c.width = 1024;
+    c.height = 256;
     const ctx = c.getContext('2d');
     if (bg) {
       ctx.fillStyle = bg;
@@ -32,10 +32,10 @@ export default function CanvasLabel({
     ctx.textBaseline = 'middle';
     const maxPx = c.width * maxWidthRatio;
     do {
-      ctx.font = `700 ${size}px system-ui, Segoe UI, Arial, sans-serif`;
-      if (ctx.measureText(label).width <= maxPx || size <= 18) break;
+      ctx.font = `800 ${size}px system-ui, Segoe UI, Arial, sans-serif`;
+      if (ctx.measureText(label).width <= maxPx || size <= 22) break;
       size -= 2;
-    } while (size > 18);
+    } while (size > 22);
 
     ctx.fillStyle = color;
     ctx.fillText(label, c.width / 2, c.height / 2);
