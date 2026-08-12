@@ -1072,8 +1072,8 @@ export default function MassiveChargerMesh({
         onSelectOutlet={onSelectOutlet}
       />
 
-      {/* Larger display-only HMI clone — beside cabinet, slightly above mid */}
-      <group visible={lcdPeek} position={[bodyW / 2 + 1.65, 2.2, bodyD / 2 + 0.05]}>
+      {/* Larger display-only HMI clone — kept inside the stage frame */}
+      <group visible={lcdPeek} position={[bodyW / 2 + 1.2, 2.2, bodyD / 2 + 0.05]}>
         <ChargerLcdScreen
           connector={active}
           connectors={connectors}
@@ -1084,7 +1084,7 @@ export default function MassiveChargerMesh({
           hardware={hardware}
           tariff={tariff}
           position={[0, 0, 0.02]}
-          size={[1.95, 1.48]}
+          size={[1.4, 1.05]}
           page={page}
           busy={busy}
           showButtons={false}
