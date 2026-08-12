@@ -142,6 +142,48 @@ export default function ActionBar({
         <span className="action-tip">Primary controls are on the 3D charger face</span>
       </p>
 
+      {charger.hardware && (
+        <section className="ctrl-section hardware-telemetry">
+          <h3>Charger hardware</h3>
+          <p className="action-tip">
+            {(charger.hardware.chargeMode === 'DC' && 'DC fast charger') ||
+              (charger.hardware.chargeMode === 'AC/DC' && 'AC/DC mixed charger') ||
+              'AC charger'}{' '}
+            · {charger.hardware.supply}
+          </p>
+          <div className="hw-grid">
+            <div>
+              <small>CPU</small>
+              <strong>{charger.hardware.cpuPercent ?? '—'}%</strong>
+              <span>{charger.hardware.cpuModel}</span>
+            </div>
+            <div>
+              <small>RAM</small>
+              <strong>
+                {Math.round(charger.hardware.ramUsedMb || 0)} / {charger.hardware.ramTotalMb} MB
+              </strong>
+            </div>
+            <div>
+              <small>ROM</small>
+              <strong>
+                {((charger.hardware.romUsedMb || 0) / 1024).toFixed(1)} /{' '}
+                {((charger.hardware.romTotalMb || 0) / 1024).toFixed(0)} GB
+              </strong>
+            </div>
+            <div>
+              <small>Temp</small>
+              <strong>
+                {charger.hardware.tempC != null ? `${charger.hardware.tempC}°C` : '—'}
+              </strong>
+              <span>
+                Module{' '}
+                {charger.hardware.moduleTempC != null ? `${charger.hardware.moduleTempC}°C` : '—'}
+              </span>
+            </div>
+          </div>
+        </section>
+      )}
+
       <RfidPad
         value={idTag}
         onChange={setIdTag}

@@ -32,6 +32,20 @@ function drawBtn(ctx, x, y, w, h, label, { fill, text, active } = {}) {
   ctx.fillText(label, x + w / 2, y + h / 2 + 1);
 }
 
+function formatMem(mb) {
+  const n = Number(mb) || 0;
+  if (n >= 1024) return `${(n / 1024).toFixed(n % 1024 === 0 ? 0 : 1)} GB`;
+  return `${Math.round(n)} MB`;
+}
+
+function formatUptime(sec) {
+  const s = Math.max(0, Math.floor(Number(sec) || 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const r = s % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}`;
+}
+
 /**
  * Touch-screen HMI for the charge point — pages + on-screen soft keys only
  * (no duplicate physical buttons on the cabinet face).
@@ -42,6 +56,7 @@ export default function ChargerLcdScreen({
   connectionState,
   cpId,
   identity = null,
+  hardware = null,
   firmwareStatus = 'Idle',
   tariff = null,
   position = [0, 2.15, 0.52],
@@ -59,10 +74,12 @@ export default function ChargerLcdScreen({
   const pageRef = useRef(page);
   const hitZonesRef = useRef([]);
   const identityRef = useRef(identity);
+  const hardwareRef = useRef(hardware);
   const fwStatusRef = useRef(firmwareStatus);
   const tariffRef = useRef(tariff);
   pageRef.current = page;
   identityRef.current = identity;
+  hardwareRef.current = hardware;
   fwStatusRef.current = firmwareStatus;
   tariffRef.current = tariff;
 
@@ -142,24 +159,69 @@ export default function ChargerLcdScreen({
 
     if (view === 'info') {
       const idn = identityRef.current || {};
+      const hw = hardwareRef.current || {};
+      const mode = hw.chargeMode || 'AC';
+      const modeLabel =
+        mode === 'DC' ? 'DC fast charger' : mode === 'AC/DC' ? 'AC/DC mixed charger' : 'AC charger';
       ctx.textAlign = 'left';
       ctx.fillStyle = '#ffb3bb';
-      ctx.font = 'bold 48px system-ui, Segoe UI, sans-serif';
-      ctx.fillText('System / Firmware', 48, contentTop + 48);
+      ctx.font = 'bold 40px system-ui, Segoe UI, sans-serif';
+      ctx.fillText('System / Hardware', 48, contentTop + 36);
+
       ctx.fillStyle = '#f7e4e6';
-      ctx.font = '34px system-ui, Segoe UI, sans-serif';
-      [
+      ctx.font = '26px system-ui, Segoe UI, sans-serif';
+      const leftLines = [
         `Vendor   ${idn.chargePointVendor || 'Massive Mobility'}`,
         `Model    ${idn.chargePointModel || 'Massive-CP-Sim-16'}`,
         `Serial   ${idn.chargePointSerialNumber || cpId || '—'}`,
         `Firmware ${idn.firmwareVersion || 'Massive-CPS-16.3.2.1'}`,
         `FW state ${fwStatusRef.current || 'Idle'}`,
-        'Protocol OCPP 1.6J',
-        `Tariff  ${(tariffRef.current?.currencySymbol || '₹')}${rate.toFixed(2)}/kWh`,
-      ].forEach((line, i) => ctx.fillText(line, 48, contentTop + 120 + i * 56));
+        `Type     ${modeLabel}`,
+        `Supply   ${hw.supply || '—'}`,
+        `CPU      ${hw.cpuModel || '—'}`,
+      ];
+      leftLines.forEach((line, i) => ctx.fillText(line, 48, contentTop + 78 + i * 36));
+
+      const tileY = contentTop + 380;
+      const tiles = [
+        { x: 48, label: 'CPU LIVE', value: `${hw.cpuPercent != null ? hw.cpuPercent : '—'}%` },
+        {
+          x: 460,
+          label: 'RAM',
+          value: `${formatMem(hw.ramUsedMb)}/${formatMem(hw.ramTotalMb)}`,
+        },
+        {
+          x: 872,
+          label: 'CABINET',
+          value: `${hw.tempC != null ? `${hw.tempC}°C` : '—'}`,
+        },
+      ];
+      tiles.forEach((t) => {
+        ctx.fillStyle = '#3a1a22';
+        roundRect(ctx, t.x, tileY, 360, 92, 14);
+        ctx.fill();
+        ctx.fillStyle = '#e8a3aa';
+        ctx.font = '22px system-ui, Segoe UI, sans-serif';
+        ctx.fillText(t.label, t.x + 22, tileY + 32);
+        ctx.fillStyle = '#ffb3bb';
+        ctx.font = 'bold 34px monospace';
+        ctx.fillText(t.value, t.x + 22, tileY + 70);
+      });
+
       ctx.fillStyle = '#e8a3aa';
-      ctx.font = '28px system-ui, Segoe UI, sans-serif';
-      ctx.fillText('How to charge: plug → RFID pad → Charging → STOP → unplug', 48, contentTop + 520);
+      ctx.font = '24px system-ui, Segoe UI, sans-serif';
+      ctx.fillText(
+        `ROM ${formatMem(hw.romUsedMb)} / ${formatMem(hw.romTotalMb)}  ·  Module ${
+          hw.moduleTempC != null ? `${hw.moduleTempC}°C` : '—'
+        }  ·  Uptime ${formatUptime(hw.uptimeSec)}`,
+        48,
+        tileY + 120
+      );
+      ctx.fillText(
+        `Cooling ${hw.cooling || '—'}  ·  OCPP 1.6J  ·  ${(tariffRef.current?.currencySymbol || '₹')}${rate.toFixed(2)}/kWh`,
+        48,
+        tileY + 152
+      );
     } else if (view === 'connectors') {
       ctx.textAlign = 'left';
       ctx.fillStyle = '#ffb3bb';

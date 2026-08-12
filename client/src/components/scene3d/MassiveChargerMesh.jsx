@@ -806,6 +806,7 @@ export default function MassiveChargerMesh({
   cpId = '',
   identity = null,
   firmwareStatus = 'Idle',
+  hardware = null,
   tariff = null,
   busy = false,
   onSelectOutlet,
@@ -1035,6 +1036,7 @@ export default function MassiveChargerMesh({
         cpId={cpId}
         identity={identity}
         firmwareStatus={firmwareStatus}
+        hardware={hardware}
         tariff={tariff}
         position={[0, 2.42, bodyD / 2 + 0.105]}
         size={[0.92, 0.78]}

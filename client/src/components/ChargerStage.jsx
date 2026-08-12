@@ -98,6 +98,24 @@ export default function ChargerStage({
             ? ` · ${charger.firmwareStatus}`
             : ''}
         </span>
+        {charger.hardware && (
+          <span
+            className="meta-pill"
+            title={`${charger.hardware.cpuModel || ''} · ${charger.hardware.supply || ''} · ${
+              charger.hardware.cooling || ''
+            }`}
+          >
+            {charger.hardware.chargeMode || 'AC'} · CPU {charger.hardware.cpuPercent ?? '—'}% · RAM{' '}
+            {Math.round(charger.hardware.ramUsedMb || 0)}/{charger.hardware.ramTotalMb || '—'} MB ·{' '}
+            {charger.hardware.tempC != null ? `${charger.hardware.tempC}°C` : '—'}
+          </span>
+        )}
+        {charger.hardware && (
+          <span className="meta-pill" title="Flash / ROM usage">
+            ROM {Math.round((charger.hardware.romUsedMb || 0) / 1024 * 10) / 10}/
+            {Math.round((charger.hardware.romTotalMb || 0) / 1024)} GB
+          </span>
+        )}
         <div className="multi-chips">
           {guns.map((c) => {
             const on = selected.includes(c.number);
@@ -129,6 +147,7 @@ export default function ChargerStage({
           cpId={charger.cpId}
           identity={charger.identity}
           firmwareStatus={charger.firmwareStatus}
+          hardware={charger.hardware}
           tariff={{
             energyRatePerKwh: charger.energyRatePerKwh,
             currency: charger.currency,

@@ -1281,6 +1281,39 @@
   flex-direction: column;
   gap: 0.4rem;
 }
+.hw-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem;
+}
+.hw-grid > div {
+  background: #fafbfc;
+  border: 1px solid var(--steel);
+  border-radius: 8px;
+  padding: 0.4rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+  min-width: 0;
+}
+.hw-grid small {
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.hw-grid strong {
+  font-size: 0.92rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--brand-deep);
+}
+.hw-grid span {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .ctrl-section h3,
 .rfid-pad h3 {
   margin: 0;

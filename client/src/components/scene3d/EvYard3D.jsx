@@ -118,6 +118,7 @@ function SceneContent(props) {
     busy,
     identity,
     firmwareStatus,
+    hardware,
     tariff,
     onSelectOutlet,
     onToggleSelectOutlet,
@@ -157,6 +158,7 @@ function SceneContent(props) {
         cpId={cpId}
         identity={identity}
         firmwareStatus={firmwareStatus}
+        hardware={hardware}
         tariff={tariff}
         busy={busy}
         onSelectOutlet={onSelectOutlet}

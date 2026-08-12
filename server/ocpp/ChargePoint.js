@@ -40,6 +40,9 @@ export class ChargePoint {
       // BootNotification firmwareVersion — Massive Mobility CP simulator firmware
       firmwareVersion: options.firmware || 'Massive-CPS-16.3.2.1',
     };
+    this._startedAt = Date.now();
+    this.hardwareTimer = null;
+    this.hardware = null; // filled after connectors exist
     this.firmware = {
       status: 'Idle', // OCPP FirmwareStatusNotification status
       location: null,
@@ -131,12 +134,104 @@ export class ChargePoint {
     this.energyRatePerKwh = Number(options.energyRatePerKwh ?? 18.5);
     this.currency = options.currency || 'INR';
     this.currencySymbol = options.currencySymbol || '₹';
+    this.hardware = this._buildHardwareProfile(options);
+    this._startHardwareTelemetry();
   }
 
   /* ---------- public API for UI / registry ---------- */
 
   getConnector(id) {
     return this.connectors.find((c) => c.number === id) || null;
+  }
+
+  _isDcConnector(type, powerKw) {
+    const t = String(type || '').toLowerCase();
+    if (/ccs|chademo|gb\/?\s*t\s*dc|nacs|combo/.test(t)) return true;
+    if (/mennekes|type\s*2|t2|schuko|j1772|type\s*1|ac\b/.test(t)) return false;
+    return Number(powerKw) >= 40;
+  }
+
+  _deriveChargeMode() {
+    const guns = (this.connectors || []).filter((c) => c.number > 0);
+    if (!guns.length) return Number(this.powerKw) >= 40 ? 'DC' : 'AC';
+    const flags = guns.map((c) => this._isDcConnector(c.type, c.powerKw));
+    if (flags.every(Boolean)) return 'DC';
+    if (flags.every((f) => !f)) return 'AC';
+    return 'AC/DC';
+  }
+
+  _buildHardwareProfile(options = {}) {
+    const mode = this._deriveChargeMode();
+    const isDc = mode === 'DC' || mode === 'AC/DC';
+    const ramTotalMb = Math.max(256, Number(options.ramMb) || (isDc ? 2048 : 1024));
+    const romTotalMb = Math.max(512, Number(options.romMb) || (isDc ? 16384 : 8192));
+    return {
+      cpuModel: options.cpuModel || (isDc ? 'ARM Cortex-A72 Quad @ 1.8 GHz' : 'ARM Cortex-A53 Quad @ 1.4 GHz'),
+      ramTotalMb,
+      romTotalMb,
+      chargeMode: mode,
+      supply: mode === 'AC' ? 'AC grid → AC EVSE' : mode === 'DC' ? 'AC grid → DC rectifier' : 'Mixed AC/DC outlets',
+      cooling: isDc ? 'Forced-air + liquid-assisted power module' : 'Forced-air',
+      cpuPercent: 9,
+      ramUsedMb: Math.round(ramTotalMb * 0.28),
+      romUsedMb: Math.round(romTotalMb * 0.18),
+      tempC: 32.0,
+      moduleTempC: 34.0,
+      uptimeSec: 0,
+    };
+  }
+
+  _startHardwareTelemetry() {
+    this._stopHardwareTelemetry();
+    this._tickHardware(false);
+    this.hardwareTimer = setInterval(() => this._tickHardware(true), 2000);
+  }
+
+  _stopHardwareTelemetry() {
+    if (this.hardwareTimer) {
+      clearInterval(this.hardwareTimer);
+      this.hardwareTimer = null;
+    }
+  }
+
+  _tickHardware(broadcast = true) {
+    if (!this.hardware) return;
+    const charging = (this.connectors || []).some((c) => c.status === 'Charging');
+    const faulted = (this.connectors || []).some((c) => c.status === 'Faulted');
+    const powerKwLive = (this.connectors || []).reduce(
+      (s, c) => s + (Number(c.powerW) || 0) / 1000,
+      0
+    );
+    const baseCpu = charging ? 38 : this.connectionState === 'online' ? 12 : 6;
+    const cpu = Math.min(
+      97,
+      baseCpu + powerKwLive * 0.35 + (faulted ? 8 : 0) + (Math.random() * 7 - 1.5)
+    );
+    this.hardware.cpuPercent = Number(cpu.toFixed(1));
+    const ramBase = this.hardware.ramTotalMb * (charging ? 0.46 : 0.3);
+    this.hardware.ramUsedMb = Math.min(
+      this.hardware.ramTotalMb - 32,
+      Math.round(ramBase + Math.random() * this.hardware.ramTotalMb * 0.05)
+    );
+    this.hardware.romUsedMb = Math.min(
+      this.hardware.romTotalMb - 64,
+      Math.round(this.hardware.romTotalMb * 0.18 + (charging ? 12 : 0) + Math.random() * 8)
+    );
+    const ambient = 28;
+    const heat = (charging ? 11 : 3.5) + powerKwLive * 0.18 + (faulted ? 6 : 0);
+    this.hardware.tempC = Number((ambient + heat + (Math.random() - 0.5) * 1.4).toFixed(1));
+    this.hardware.moduleTempC = Number(
+      (this.hardware.tempC + (charging ? 5.5 : 1.8) + Math.random() * 1.2).toFixed(1)
+    );
+    this.hardware.chargeMode = this._deriveChargeMode();
+    this.hardware.supply =
+      this.hardware.chargeMode === 'AC'
+        ? 'AC grid → AC EVSE'
+        : this.hardware.chargeMode === 'DC'
+          ? 'AC grid → DC rectifier'
+          : 'Mixed AC/DC outlets';
+    this.hardware.uptimeSec = Math.max(0, Math.floor((Date.now() - this._startedAt) / 1000));
+    if (broadcast) this.broadcastState();
   }
 
   getPublicState() {
@@ -149,6 +244,7 @@ export class ChargePoint {
       bootAccepted: this.bootAccepted,
       requireSubprotocol: this.requireSubprotocol,
       identity: this.identity,
+      hardware: this.hardware ? { ...this.hardware } : null,
       firmwareStatus: this.firmware.status,
       diagnosticsStatus: this.diagnostics.status,
       diagnosticsFileName: this.diagnostics.fileName,
@@ -251,6 +347,7 @@ export class ChargePoint {
 
   async start() {
     this.shouldRun = true;
+    this._startHardwareTelemetry();
     await this.connect();
   }
 
@@ -260,6 +357,7 @@ export class ChargePoint {
     this._stopHeartbeat();
     this._stopWsPing();
     this._stopAllMeters();
+    this._stopHardwareTelemetry();
     if (this.firmware?.updateTimer) {
       clearTimeout(this.firmware.updateTimer);
       this.firmware.updateTimer = null;
