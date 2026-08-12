@@ -26,7 +26,7 @@ function drawBtn(ctx, x, y, w, h, label, { fill, text, active } = {}) {
     ctx.stroke();
   }
   ctx.fillStyle = text || '#fff5f6';
-  ctx.font = 'bold 40px system-ui, Segoe UI, sans-serif';
+  ctx.font = 'bold 50px system-ui, Segoe UI, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(label, x + w / 2, y + h / 2 + 1);
@@ -147,23 +147,23 @@ export default function ChargerLcdScreen({
 
     // top status bar
     ctx.fillStyle = '#2a1218';
-    ctx.fillRect(20, 20, W - 40, 88);
+    ctx.fillRect(20, 20, W - 40, 100);
     ctx.fillStyle = '#ffb3bb';
-    ctx.font = 'bold 44px system-ui, Segoe UI, sans-serif';
+    ctx.font = 'bold 54px system-ui, Segoe UI, sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillText('MASSIVE CHARGE POINT', 44, 64);
-    ctx.font = '28px monospace';
+    ctx.fillText('MASSIVE CHARGE POINT', 44, 70);
+    ctx.font = '34px monospace';
     ctx.fillStyle = '#e8a3aa';
     const id = String(cpId || 'CP');
-    ctx.fillText(id.length > 18 ? `${id.slice(0, 16)}…` : id, 520, 64);
-    ctx.font = 'bold 30px system-ui, Segoe UI, sans-serif';
+    ctx.fillText(id.length > 18 ? `${id.slice(0, 16)}…` : id, 560, 70);
+    ctx.font = 'bold 36px system-ui, Segoe UI, sans-serif';
     ctx.fillStyle = online ? '#ffb3bb' : '#ffb74d';
     ctx.textAlign = 'right';
-    ctx.fillText(online ? 'ONLINE' : String(connectionState || 'OFFLINE').toUpperCase(), W - 48, 64);
+    ctx.fillText(online ? 'ONLINE' : String(connectionState || 'OFFLINE').toUpperCase(), W - 48, 70);
 
     const withButtons = showButtonsRef.current;
-    const contentTop = 130;
+    const contentTop = 140;
     const contentBottom = withButtons ? H - 240 : H - 48;
 
     if (view === 'info') {
@@ -174,11 +174,11 @@ export default function ChargerLcdScreen({
         mode === 'DC' ? 'DC fast charger' : mode === 'AC/DC' ? 'AC/DC mixed charger' : 'AC charger';
       ctx.textAlign = 'left';
       ctx.fillStyle = '#ffb3bb';
-      ctx.font = 'bold 40px system-ui, Segoe UI, sans-serif';
-      ctx.fillText('System / Hardware', 48, contentTop + 36);
+      ctx.font = 'bold 48px system-ui, Segoe UI, sans-serif';
+      ctx.fillText('System / Hardware', 48, contentTop + 40);
 
       ctx.fillStyle = '#f7e4e6';
-      ctx.font = '26px system-ui, Segoe UI, sans-serif';
+      ctx.font = '32px system-ui, Segoe UI, sans-serif';
       const leftLines = [
         `Vendor   ${idn.chargePointVendor || 'Massive Mobility'}`,
         `Model    ${idn.chargePointModel || 'Massive-CP-Sim-16'}`,
@@ -189,9 +189,9 @@ export default function ChargerLcdScreen({
         `Supply   ${hw.supply || '—'}`,
         `CPU      ${hw.cpuModel || '—'}`,
       ];
-      leftLines.forEach((line, i) => ctx.fillText(line, 48, contentTop + 78 + i * 36));
+      leftLines.forEach((line, i) => ctx.fillText(line, 48, contentTop + 86 + i * 40));
 
-      const tileY = contentTop + 380;
+      const tileY = contentTop + 420;
       const tiles = [
         { x: 48, label: 'CPU LIVE', value: `${hw.cpuPercent != null ? hw.cpuPercent : '—'}%` },
         {
@@ -207,78 +207,78 @@ export default function ChargerLcdScreen({
       ];
       tiles.forEach((t) => {
         ctx.fillStyle = '#3a1a22';
-        roundRect(ctx, t.x, tileY, 360, 92, 14);
+        roundRect(ctx, t.x, tileY, 360, 100, 14);
         ctx.fill();
         ctx.fillStyle = '#e8a3aa';
-        ctx.font = '22px system-ui, Segoe UI, sans-serif';
-        ctx.fillText(t.label, t.x + 22, tileY + 32);
+        ctx.font = '28px system-ui, Segoe UI, sans-serif';
+        ctx.fillText(t.label, t.x + 22, tileY + 34);
         ctx.fillStyle = '#ffb3bb';
-        ctx.font = 'bold 34px monospace';
-        ctx.fillText(t.value, t.x + 22, tileY + 70);
+        ctx.font = 'bold 42px monospace';
+        ctx.fillText(t.value, t.x + 22, tileY + 76);
       });
 
       ctx.fillStyle = '#e8a3aa';
-      ctx.font = '24px system-ui, Segoe UI, sans-serif';
+      ctx.font = '30px system-ui, Segoe UI, sans-serif';
       ctx.fillText(
         `ROM ${formatMem(hw.romUsedMb)} / ${formatMem(hw.romTotalMb)}  ·  Module ${
           hw.moduleTempC != null ? `${hw.moduleTempC}°C` : '—'
         }  ·  Uptime ${formatUptime(hw.uptimeSec)}`,
         48,
-        tileY + 120
+        tileY + 128
       );
       ctx.fillText(
         `Cooling ${hw.cooling || '—'}  ·  OCPP 1.6J  ·  ${(tariffRef.current?.currencySymbol || '₹')}${rate.toFixed(2)}/kWh`,
         48,
-        tileY + 152
+        tileY + 164
       );
     } else if (view === 'connectors') {
       ctx.textAlign = 'left';
       ctx.fillStyle = '#ffb3bb';
-      ctx.font = 'bold 48px system-ui, Segoe UI, sans-serif';
-      ctx.fillText('Outlets', 48, contentTop + 48);
+      ctx.font = 'bold 58px system-ui, Segoe UI, sans-serif';
+      ctx.fillText('Outlets', 48, contentTop + 52);
       ctx.fillStyle = '#e8a3aa';
-      ctx.font = '28px system-ui, Segoe UI, sans-serif';
+      ctx.font = '34px system-ui, Segoe UI, sans-serif';
       ctx.fillText(
         withButtons ? 'Tap a row to focus that connector' : 'Connector status overview',
         48,
-        contentTop + 96
+        contentTop + 102
       );
       guns.forEach((g, i) => {
-        const y = contentTop + 120 + i * 100;
-        if (y + 86 > contentBottom) return;
+        const y = contentTop + 128 + i * 108;
+        if (y + 94 > contentBottom) return;
         const focused = g.number === c?.number;
         ctx.fillStyle = focused ? '#5a2030' : '#3a1a22';
-        roundRect(ctx, 48, y, W - 96, 88, 14);
+        roundRect(ctx, 48, y, W - 96, 96, 14);
         ctx.fill();
         if (focused) {
           ctx.strokeStyle = '#ffb3bb';
           ctx.lineWidth = 4;
-          roundRect(ctx, 48, y, W - 96, 88, 14);
+          roundRect(ctx, 48, y, W - 96, 96, 14);
           ctx.stroke();
         }
         ctx.fillStyle = g.status === 'Charging' ? '#ffb3bb' : '#fff5f6';
-        ctx.font = 'bold 40px system-ui, Segoe UI, sans-serif';
-        ctx.fillText(`C${g.number}`, 72, y + 54);
-        ctx.font = '30px system-ui, Segoe UI, sans-serif';
+        ctx.font = 'bold 48px system-ui, Segoe UI, sans-serif';
+        ctx.fillText(`C${g.number}`, 72, y + 58);
+        ctx.font = '36px system-ui, Segoe UI, sans-serif';
         ctx.fillStyle = '#e8b0b6';
         ctx.fillText(
           `${g.name || `Connector ${g.number}`} · ${g.status} · ${g.powerKw} kW · ${g.cablePlugged ? 'PLUGGED' : 'IDLE'}`,
           180,
-          y + 54
+          y + 58
         );
       });
     } else if (view === 'session') {
       ctx.textAlign = 'left';
       ctx.fillStyle = '#ffb3bb';
-      ctx.font = 'bold 58px system-ui, Segoe UI, sans-serif';
-      ctx.fillText((c?.status || '—').toUpperCase(), 48, contentTop + 58);
+      ctx.font = 'bold 68px system-ui, Segoe UI, sans-serif';
+      ctx.fillText((c?.status || '—').toUpperCase(), 48, contentTop + 62);
       ctx.fillStyle = '#f0d0d4';
-      ctx.font = '34px system-ui, Segoe UI, sans-serif';
-      ctx.fillText(`Outlet C${c?.number ?? '—'} · Rated ${rated} kW`, 48, contentTop + 118);
+      ctx.font = '40px system-ui, Segoe UI, sans-serif';
+      ctx.fillText(`Outlet C${c?.number ?? '—'} · Rated ${rated} kW`, 48, contentTop + 124);
 
       const tileW = 360;
-      const tileH = 170;
-      const tileY = contentTop + 150;
+      const tileH = 178;
+      const tileY = contentTop + 156;
       [
         { x: 48, label: 'ENERGY', value: `${kwh} kWh` },
         { x: 460, label: 'POWER', value: `${kw} kW` },
@@ -288,59 +288,59 @@ export default function ChargerLcdScreen({
         roundRect(ctx, t.x, tileY, tileW, tileH, 16);
         ctx.fill();
         ctx.fillStyle = '#e8a3aa';
-        ctx.font = '28px system-ui, Segoe UI, sans-serif';
-        ctx.fillText(t.label, t.x + 28, tileY + 48);
+        ctx.font = '34px system-ui, Segoe UI, sans-serif';
+        ctx.fillText(t.label, t.x + 28, tileY + 50);
         ctx.fillStyle = '#ffb3bb';
-        ctx.font = 'bold 54px monospace';
-        ctx.fillText(t.value, t.x + 28, tileY + 120);
+        ctx.font = 'bold 64px monospace';
+        ctx.fillText(t.value, t.x + 28, tileY + 126);
       });
 
       ctx.fillStyle = '#3a1a22';
-      roundRect(ctx, 48, contentTop + 350, W - 96, 150, 16);
+      roundRect(ctx, 48, contentTop + 358, W - 96, 158, 16);
       ctx.fill();
       ctx.fillStyle = '#e8a3aa';
-      ctx.font = '26px system-ui, Segoe UI, sans-serif';
-      ctx.fillText(txLabel, 72, contentTop + 390);
-      ctx.fillText(tagLabel, 72, contentTop + 445);
+      ctx.font = '32px system-ui, Segoe UI, sans-serif';
+      ctx.fillText(txLabel, 72, contentTop + 402);
+      ctx.fillText(tagLabel, 72, contentTop + 458);
       ctx.fillStyle = '#ffb3bb';
-      ctx.font = 'bold 40px monospace';
-      ctx.fillText(txDisplay, 320, contentTop + 390);
-      ctx.fillText(tagDisplay, 320, contentTop + 445);
+      ctx.font = 'bold 48px monospace';
+      ctx.fillText(txDisplay, 340, contentTop + 402);
+      ctx.fillText(tagDisplay, 340, contentTop + 458);
 
       ctx.fillStyle = '#f0d0d4';
-      ctx.font = '28px system-ui, Segoe UI, sans-serif';
+      ctx.font = '34px system-ui, Segoe UI, sans-serif';
       ctx.fillText(
         `Rate  ${sym}${rate.toFixed(2)}/kWh  ·  SoC  ${c?.soc != null ? `${c.soc}%` : '—'}`,
         48,
-        contentTop + 530
+        contentTop + 545
       );
     } else {
       ctx.textAlign = 'left';
       ctx.fillStyle = '#ffb3bb';
-      ctx.font = 'bold 56px system-ui, Segoe UI, sans-serif';
-      ctx.fillText('Ready to charge', 48, contentTop + 52);
+      ctx.font = 'bold 66px system-ui, Segoe UI, sans-serif';
+      ctx.fillText('Ready to charge', 48, contentTop + 56);
       ctx.fillStyle = '#f0d0d4';
-      ctx.font = '32px system-ui, Segoe UI, sans-serif';
+      ctx.font = '38px system-ui, Segoe UI, sans-serif';
       ctx.fillText(
         withButtons
           ? 'Use the touch buttons below · or the RFID pad'
           : 'Outlet status and session meters',
         48,
-        contentTop + 110
+        contentTop + 116
       );
 
       ctx.fillStyle = '#3a1a22';
-      roundRect(ctx, 48, contentTop + 150, W - 96, 140, 16);
+      roundRect(ctx, 48, contentTop + 156, W - 96, 150, 16);
       ctx.fill();
       ctx.fillStyle = '#ffb3bb';
-      ctx.font = 'bold 48px system-ui, Segoe UI, sans-serif';
-      ctx.fillText((c?.status || 'Available').toUpperCase(), 80, contentTop + 215);
+      ctx.font = 'bold 56px system-ui, Segoe UI, sans-serif';
+      ctx.fillText((c?.status || 'Available').toUpperCase(), 80, contentTop + 226);
       ctx.fillStyle = '#e8b0b6';
-      ctx.font = '30px system-ui, Segoe UI, sans-serif';
+      ctx.font = '36px system-ui, Segoe UI, sans-serif';
       ctx.fillText(
         `${c?.name || `Outlet C${c?.number ?? '—'}`} · C${c?.number ?? '—'} · ${rated} kW`,
         80,
-        contentTop + 260
+        contentTop + 274
       );
 
       const tiles = [
@@ -350,19 +350,19 @@ export default function ChargerLcdScreen({
       ];
       tiles.forEach((t) => {
         ctx.fillStyle = '#2a1218';
-        roundRect(ctx, t.x, contentTop + 320, 360, 130, 14);
+        roundRect(ctx, t.x, contentTop + 332, 360, 140, 14);
         ctx.fill();
         ctx.fillStyle = '#e8a3aa';
-        ctx.font = '26px system-ui, Segoe UI, sans-serif';
-        ctx.fillText(t.label, t.x + 28, contentTop + 365);
+        ctx.font = '32px system-ui, Segoe UI, sans-serif';
+        ctx.fillText(t.label, t.x + 28, contentTop + 380);
         ctx.fillStyle = '#ffb3bb';
-        ctx.font = 'bold 44px monospace';
-        ctx.fillText(t.value, t.x + 28, contentTop + 420);
+        ctx.font = 'bold 52px monospace';
+        ctx.fillText(t.value, t.x + 28, contentTop + 438);
       });
 
       const fw = identityRef.current?.firmwareVersion || 'Massive-CPS-16.3.2.1';
       ctx.fillStyle = '#8aa89a';
-      ctx.font = '26px monospace';
+      ctx.font = '32px monospace';
       ctx.textAlign = 'left';
       ctx.fillText(`FW ${fw}`, 48, contentBottom - 10);
     }
@@ -419,9 +419,9 @@ export default function ChargerLcdScreen({
 
       if (view === 'connectors') {
         guns.forEach((g, i) => {
-          const y = contentTop + 120 + i * 100;
-          if (y + 86 > contentBottom) return;
-          zones.push({ id: `outlet:${g.number}`, x: 44, y: y - 2, w: W - 88, h: 92 });
+          const y = contentTop + 128 + i * 108;
+          if (y + 94 > contentBottom) return;
+          zones.push({ id: `outlet:${g.number}`, x: 44, y: y - 2, w: W - 88, h: 100 });
         });
       }
     }
