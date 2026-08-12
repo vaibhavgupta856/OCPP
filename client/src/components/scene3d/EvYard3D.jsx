@@ -4,9 +4,9 @@ import { ContactShadows, Environment, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import MassiveChargerMesh from './MassiveChargerMesh.jsx';
 
-/** Front-facing framing — closer so HMI display reads clearly */
-const FRONT_CAM = [0, 1.35, 5.85];
-const FRONT_TARGET = [0, 2.35, 0];
+/** Front-facing framing — full pedestal + guns visible, HMI still readable */
+const FRONT_CAM = [0, 1.15, 6.9];
+const FRONT_TARGET = [0, 2.2, 0];
 
 function FrontFacingCamera() {
   const { camera, controls, gl } = useThree();
@@ -14,14 +14,14 @@ function FrontFacingCamera() {
     camera.position.set(...FRONT_CAM);
     camera.near = 0.1;
     camera.far = 80;
-    camera.fov = 40;
+    camera.fov = 42;
     camera.updateProjectionMatrix();
     camera.lookAt(...FRONT_TARGET);
     gl.domElement.style.cursor = 'default';
     if (controls) {
       controls.target.set(...FRONT_TARGET);
-      controls.minDistance = 4.2;
-      controls.maxDistance = 12;
+      controls.minDistance = 5;
+      controls.maxDistance = 13;
       controls.update();
     }
   }, [camera, controls, gl]);
@@ -189,8 +189,8 @@ function SceneContent(props) {
         dampingFactor={0.08}
         minPolarAngle={0.25}
         maxPolarAngle={1.45}
-        minDistance={4.2}
-        maxDistance={12}
+        minDistance={5}
+        maxDistance={13}
         target={FRONT_TARGET}
       />
       <FrontFacingCamera />
@@ -209,7 +209,7 @@ export default function EvYard3D(props) {
       <Canvas
         shadows
         dpr={[1, 1.25]}
-        camera={{ position: FRONT_CAM, fov: 40, near: 0.5, far: 40 }}
+        camera={{ position: FRONT_CAM, fov: 42, near: 0.5, far: 40 }}
         gl={{
           antialias: true,
           alpha: false,
