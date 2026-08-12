@@ -1,304 +1,356 @@
-# Massive Mobility Charging Simulator — User Guide
+# Massive Mobility Charging Simulator — Website User Guide
 
-A practical guide for new users: how to open the simulator, connect a charger to your CMS, run a charging session, and use each part of the console.
+How to use the **live simulator website** to commission a charger, run sessions, and work every panel.
 
----
+**Website:** https://massive-ocpp-simulator.onrender.com  
 
-## 1. What this app is
-
-This is an **OCPP 1.6 Charge Point (EVSE) simulator**.
-
-| It is | It is not |
-|-------|-----------|
-| A virtual charger that talks to a real CMS | A CMS / Central System |
-| A lab tool for testing Massive Charging (or any OCPP 1.6 CSMS) | Real hardware firmware |
-| A 3D + 2D control panel for plug / RFID / start / stop | A production charger UI for drivers |
-
-**Live site:** https://massive-ocpp-simulator.onrender.com  
-*(Free Render instances may sleep; first open can take ~1 minute.)*
-
-**Local:** run `.\start.ps1` then open http://localhost:5173
+> Free hosting may sleep when idle. If the first open is slow, wait about one minute and refresh.
 
 ---
 
-## 2. Screen layout
+## 1. What you are using
+
+This website simulates an **EV charge point** that talks to your real CMS (for example Massive Charging) over **OCPP 1.6**.
+
+You use it to:
+
+- Connect a virtual charger to the CMS  
+- Plug / unplug cables  
+- Authorize with RFID / idTag  
+- Start and stop charging  
+- Watch live OCPP messages  
+- Inject faults and change outlet settings for lab tests  
+
+You do **not** need to install anything. Open the website and work in the browser.
+
+---
+
+## 2. Overview of the screen
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  Header — Massive Mobility · connection pills · Hide bench   │
-├──────────┬───────────────────────────────┬───────────────────┤
-│ Chargers │     3D yard (charger)         │ Bench controls    │
-│ (left)   │     + Operator panel          │ (right)           │
-│          │                               │                   │
-├──────────┴───────────────────────────────┴───────────────────┤
-│  Message Trace — OCPP frames + system logs                   │
+│  TOP BAR — brand, status pills, Hide bench                   │
+├────────────┬─────────────────────────────┬───────────────────┤
+│ LEFT PANEL │     CENTER STAGE            │ RIGHT PANEL       │
+│ Chargers   │     3D charger +            │ Bench controls    │
+│            │     Operator panel          │                   │
+├────────────┴─────────────────────────────┴───────────────────┤
+│ BOTTOM — Message Trace                                       │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-| Area | Purpose |
-|------|---------|
-| **Chargers (left)** | Commission / select / remove charge points |
-| **3D yard (center)** | Touch the charger HMI, RFID pad, and guns |
-| **Operator panel** | 2D buttons under the yard (plug / start / stop…) |
-| **Bench controls (right)** | Auth, session, car battery, faults, power, reconnect |
-| **Message Trace (bottom)** | Live OCPP messages and simulator logs |
+Every side panel has:
 
-Panels can be **dragged** (⋮⋮ Drag), **resized** from edges, and **Dock**ed again.
+- **⋮⋮ Drag** — move the panel (undocks it as a floating window)  
+- **Edge drag** — resize  
+- **Dock** — snap it back to its normal place  
+
+Use **Hide bench** in the top bar to hide or show the right panel and give the charger more width.
 
 ---
 
-## 3. First connection (5 minutes)
+## 3. Top bar
 
-### Step 1 — Commission a charger
-
-In the left **Chargers** form:
-
-1. **Charge Point ID** — unique ID your CMS expects (example: `MASSIVE-CP-001`)
-2. **CSMS WebSocket base** — CMS OCPP URL **without** the charge-point id  
-   Example: `wss://your-cms.example.com/ocpp/1.6`  
-   The simulator connects to: `{base}/{cpId}`
-3. **Default kW** — rated power (e.g. `22`)
-4. **Connectors** — 1 to 4 outlets
-5. Optional per-connector kW and name
-6. **Require ocpp1.6 subprotocol** — leave ON unless your CMS rejects it
-7. **Basic Auth (optional)** — only if your CMS needs username/password on the WebSocket handshake (not RFID)
-8. Click **Connect EVSE**
-
-### Step 2 — Wait for online
-
-Watch the header / left list:
-
-- `connecting` → handshake in progress  
-- `online` → WebSocket up; BootNotification should be Accepted  
-- `reconnecting` → link dropped; simulator will retry  
-
-Use **Message Trace → OCPP** to confirm `BootNotification` and `Heartbeat`.
-
-### Step 3 — Run a demo charge
-
-Default demo tags work in **Local or CMS** auth mode:
-
-- `CARD-7F2A91`
-- `FOB-ORBIT-44`
-- `TOKEN-MASSIVE-09`
-
-Typical flow:
-
-1. **Plug** the cable (3D gun double-click / HMI **PLUG** / Operator panel **Plug cable**)
-2. Tap **RFID** on the charger (or **START** / **Tap RFID / Card**)
-3. Watch status → **Charging**, energy + cost update on the screen
-4. **STOP** when done, then **UNPLUG**
+| Control | What it does |
+|---------|----------------|
+| **Massive Mobility** | Product header |
+| **N chargers** | How many charge points you have commissioned |
+| **online / connecting / offline / reconnecting** | Link state of the selected charger |
+| **Hide bench / Bench controls** | Show or hide the right **Bench controls** panel |
 
 ---
 
-## 4. Using the 3D charger
+## 4. Left panel — Chargers
 
-### Orbit / zoom
+This is where you create and pick charge points.
 
-- **Drag** — orbit around the charger  
-- **Scroll** — zoom  
-- Default view shows the full pedestal and HMI
+### Commission form
+
+| Field | How to use it |
+|-------|----------------|
+| **Charge Point ID** | Unique ID for this virtual charger (must match what the CMS expects). Example: `MASSIVE-CP-001` |
+| **CSMS WebSocket base** | CMS OCPP base URL **without** the charge-point ID. Example: `wss://your-cms.example.com/ocpp/1.6`. The site connects to `{base}/{Charge Point ID}` |
+| **Default kW** | Rated power used for outlets (example: `22`) |
+| **Connectors** | Number of guns / outlets (1–4) |
+| **C1…Cn kW / name** | Optional per-outlet power and label |
+| **Require ocpp1.6 subprotocol** | Keep ON unless your CMS rejects the `ocpp1.6` WebSocket subprotocol |
+| **Basic Auth (optional)** | Username / password only if the CMS requires HTTP Basic Auth on the WebSocket. This is **not** an RFID card |
+| **Connect EVSE** | Creates the charger and starts connecting to the CMS |
+
+### After you connect
+
+- The new charger appears in the list under the form  
+- Click a charger row to select it (center + right panels follow that charger)  
+- Use remove / disconnect controls on the row if you need to delete it  
+- **Hide form / Commission** toggles the commission form to free space  
+
+### Connection states
+
+| State | Meaning |
+|-------|---------|
+| **connecting** | Opening WebSocket / sending BootNotification |
+| **online** | Connected; Heartbeats should be running |
+| **reconnecting** | Link lost; automatic retry |
+| **offline** | Not connected |
+
+---
+
+## 5. Center stage — 3D charger
+
+The large middle area shows the Massive cabinet.
+
+### View controls
+
+| Action | Result |
+|--------|--------|
+| **Drag** on the yard | Orbit around the charger |
+| **Scroll** | Zoom in / out |
+| Goal | Keep the full pedestal, screen, and side guns visible |
 
 ### Touch screen (HMI)
 
-On-screen pages:
+Tap the on-charger display.
 
-| Page | What you see |
-|------|----------------|
-| **HOME** | Ready status, energy / power / cost tiles |
-| **SESSION** | Active or last transaction, idTag, SoC |
-| **OUTLETS** | All connectors — tap a row to focus that outlet |
-| **INFO** | Vendor, model, serial, firmware, AC/DC type, live CPU / RAM / ROM / temp |
+#### Pages
 
-Soft keys at the bottom:
+| Soft key | What you see / do |
+|----------|-------------------|
+| **HOME** | Ready status, live energy / power / cost tiles |
+| **SESSION** | Current or last transaction, idTag, SoC, rate |
+| **OUTLETS** | List of connectors. Tap a row to focus that outlet (C1, C2, …) |
+| **INFO** | System identity + live hardware: vendor, model, serial, firmware, AC/DC type, CPU, RAM, ROM, temperatures, uptime |
 
-- **PLUG / UNPLUG**
-- **START**
-- **STOP**
-- **CLEAR** (when faulted)
+#### Action keys (bottom of the screen)
+
+| Key | What it does |
+|-----|----------------|
+| **PLUG / UNPLUG** | Plug or remove the cable on the focused outlet |
+| **START** | Start charging with the current idTag |
+| **STOP** | Stop the active transaction |
+| **CLEAR** | Clear a fault when the outlet is Faulted |
 
 ### RFID pad
 
-The physical pad on the cabinet face starts a charge with the current idTag (same as card tap).
+The pad on the cabinet face starts a charge using the current idTag (same idea as tapping a card).
 
 ### Guns / cables
 
-Side connectors represent outlets **C1…C4**. Double-click / use plug controls to plug or unplug the focused outlet.
+Side guns are the connectors. Plug / unplug via the HMI, Operator panel, or Bench **Cable** section. Focus the correct outlet first (OUTLETS page or by selecting it in controls).
 
 ---
 
-## 5. Operator panel (under the yard)
+## 6. Center stage — Operator panel
 
-Always-visible 2D controls for the focused outlet(s):
+Below the 3D yard is the **Operator panel** (always visible; scroll the center stage if needed).
 
-| Button | Action |
-|--------|--------|
-| Plug / Unplug cable | Cable plugged state |
-| Start charge | StartTransaction with current idTag |
-| Stop charge | StopTransaction |
-| Tap RFID / Card | Same as RFID pad |
-| Emergency stop | Immediate stop with emergency reason |
-| Clear fault | Clear a faulted connector |
-| C*n* kW | Change rated power for that outlet |
+| Control | What it does |
+|---------|----------------|
+| **Title line** | Shows focused outlet (e.g. C1), status, energy, cost |
+| **Auth** | Same auth modes as the right bench (see below) |
+| **idTag** | RFID / token used for Start / card tap |
+| **Add to local list** | Saves the typed idTag into the simulator’s local allow-list |
+| **Plug / Unplug cable** | Cable state for the focused outlet(s) |
+| **Start charge** | Starts a session |
+| **Stop charge** | Stops the session |
+| **Tap RFID / Card** | Authorizes and starts like a card tap |
+| **Emergency stop** | Immediate emergency stop |
+| **Clear fault** | Clears fault on the focused outlet |
+| **Cn kW** | Change rated kW for that outlet |
 
-Also set **Auth** mode and **idTag** here.
+Use this panel when you want quick 2D buttons without touching the 3D HMI.
 
 ---
 
-## 6. Bench controls (right rail)
+## 7. Right panel — Bench controls
 
-Scroll this panel for advanced lab controls.
+Detailed lab controls for the **selected** charger and **focused** outlet. Scroll inside the panel.
+
+### Status summary (top)
+
+Shows outlet number, name, status, kW, session kWh, cost, and optional smart limit / diagnostics state.
+
+### Charger hardware
+
+Live **simulated** telemetry (for display / lab feel):
+
+| Tile | Meaning |
+|------|---------|
+| **CPU** | Processor load % + CPU model |
+| **RAM** | Used / total memory |
+| **ROM** | Used / total flash storage |
+| **Temp** | Cabinet temperature + power-module temperature |
+| Type line | **AC**, **DC**, or **AC/DC** based on connector types |
+
+### RFID pad (bench)
+
+Same card flow as the physical pad: pick/type an idTag, tap to start.
+
+Demo tags (work when Auth is **Local or CMS** or **Local only**):
+
+- `CARD-7F2A91`  
+- `FOB-ORBIT-44`  
+- `TOKEN-MASSIVE-09`  
 
 ### Auth mode
 
-| Mode | Behavior |
-|------|----------|
-| **Local or CMS** (default) | Demo tags work locally; real CMS tags also work |
-| **Local only** | Only tags in the local list |
-| **CMS only** | CMS Authorize must Accept (use real Massive RFIDs) |
+| Mode | When to use it |
+|------|----------------|
+| **Local or CMS** | Default. Demo tags work; real CMS tags also work |
+| **Local only** | Only tags stored in the local list |
+| **CMS only** | CMS must Accept the idTag (use a real Massive RFID / registered token) |
 
-Add custom tags with **Add to local list** or the RFID pad presets.
+### Cable
 
-### Cable / Session
+Plug or unplug the focused connector.
 
-- Plug / unplug  
-- Start / stop with selectable stop reason  
-- Emergency stop  
+### Session
+
+| Control | What it does |
+|---------|----------------|
+| **Start** | StartTransaction with current idTag |
+| **Stop reason** | Reason sent with StopTransaction (Local, EVDisconnected, …) |
+| **Stop** | End the session with the selected reason |
+| **Emergency** | Emergency stop |
 
 ### Car configuration
 
-Simulates the EV battery before you start:
+Set the simulated EV battery **before** you start charging:
 
 | Field | Meaning |
 |-------|---------|
-| Energy already in car (kWh) | How full the pack is now |
-| Battery capacity (kWh) | Full pack size |
-| Fill mode | Full / by energy / by money / by time |
+| **Energy already in car (kWh)** | Energy already in the pack |
+| **Battery capacity (kWh)** | Full pack size |
+| **Fill mode — Full** | Charge until pack is full |
+| **Fill mode — Energy** | Deliver a set kWh |
+| **Fill mode — Money** | Deliver energy worth a set amount (uses tariff) |
+| **Fill mode — Time** | Charge for a set number of minutes |
 
-Click **Set car config** before starting. Charging stops when the fill target or full pack is reached.
+Click **Set car config**, then start. Charging auto-stops when the target or full pack is reached.
 
 ### Suspend
 
-Simulate EV or EVSE pause (`SuspendedEV` / `SuspendedEVSE`).
+Simulate pause states:
+
+- Suspended by EV  
+- Suspended by EVSE  
 
 ### Faults
 
-Inject OCPP error codes (e.g. `OverCurrentFailure`, `HighTemperature`) and clear them.
+| Control | What it does |
+|---------|----------------|
+| Error code list | Choose an OCPP fault (OverCurrent, HighTemperature, …) |
+| **Inject fault** | Marks the connector Faulted and notifies the CMS |
+| **Clear fault** | Returns the connector to a healthy path |
 
-### Hardware (connector)
+### Hardware (connector settings)
 
-- Connector type (Mennekes T2, CCS Combo 2, …) — drives **AC vs DC** label  
-- Connector name  
-- Power (kW)  
-- Display tariff (₹/kWh)
-
-### Charger hardware (live)
-
-Simulated telemetry (not real silicon):
-
-- AC / DC / AC-DC mode  
-- CPU %, RAM, ROM  
-- Cabinet + module temperature  
+| Control | What it does |
+|---------|----------------|
+| **Type** | Connector standard (Mennekes T2, CCS Combo 2, CHAdeMO, …). DC-style types mark the station as DC (or AC/DC if mixed) |
+| **Name** | Friendly outlet name |
+| **Power (kW)** | Rated / max power for that outlet |
+| **Tariff** | Display rate (₹/kWh) used for cost on screen and money-based fill |
 
 ### Link
 
-- **Reconnect** — drop and reopen the OCPP WebSocket  
-- Toggle subprotocol and reconnect  
-- Soft / hard **Reset** (OCPP Reset)
+| Control | What it does |
+|---------|----------------|
+| **Reconnect** | Drop and reopen the OCPP WebSocket |
+| **Reconnect with/without subprotocol** | Retry with the opposite subprotocol setting (useful if CMS rejects `ocpp1.6`) |
+| **Soft / Hard Reset** | Sends OCPP Reset to the simulated charge point |
 
 ---
 
-## 7. Message Trace
+## 8. Bottom panel — Message Trace
 
-Bottom drawer:
+Live traffic between the simulator and the CMS.
 
-| Tab | Shows |
-|-----|--------|
-| **OCPP** | Frames to/from CMS (`→ CMS` / `← CMS`) |
-| **System** | Simulator logs (connect, boot, errors) |
+### Header controls
 
-Filters: **All**, **Station / CP**, or a specific connector **C1…**
+| Control | What it does |
+|---------|----------------|
+| **▾ / ▴ Message Trace** | Collapse or expand the message body |
+| **OCPP (N)** | Protocol frames to and from the CMS |
+| **System (N)** | Simulator logs (connect, errors, status text) |
+| **Clear** | Empty both lists |
+| **⋮⋮ Drag / resize** | Move or change height of this panel |
 
-- Drag the top edge to resize height  
-- Collapse with the Message Trace button  
-- **Clear** empties both lists  
+### Filters
 
-Use this to debug BootNotification, Authorize, StartTransaction, MeterValues, etc.
+| Filter | Shows |
+|--------|--------|
+| **All** | Everything, grouped by station / connector when useful |
+| **Station / CP** | Charge-point level messages (Boot, Heartbeat, …) |
+| **C1, C2, …** | Messages for that outlet only |
+
+### How to read OCPP rows
+
+| Marker | Meaning |
+|--------|---------|
+| **→ CMS** | Simulator sent this to the CMS |
+| **← CMS** | CMS sent this to the simulator |
+| Action name | e.g. BootNotification, Authorize, StartTransaction, MeterValues |
+| JSON payload | Details of that message |
+
+Use this panel to confirm Boot Accepted, Authorize status, meter samples, and stop reasons.
 
 ---
 
-## 8. Common workflows
+## 9. Typical website workflows
 
-### A. Local demo (no real RFID)
+### A. Quick local demo
 
-1. Auth = **Local or CMS**  
-2. idTag = `CARD-7F2A91`  
-3. Plug → Start → Stop → Unplug  
+1. Commission with your CMS base URL + a unique Charge Point ID  
+2. Wait until status is **online**  
+3. Keep Auth = **Local or CMS**  
+4. idTag = `CARD-7F2A91`  
+5. **Plug** → **Start** or tap RFID → watch charging → **Stop** → **Unplug**  
+6. Confirm frames in **Message Trace → OCPP**  
 
-### B. Test a real Massive RFID
+### B. Real CMS RFID
 
 1. Auth = **CMS only** (or Local or CMS)  
 2. Paste the CMS-registered idTag  
-3. Plug → Tap RFID / Start  
-4. Confirm Authorize Accepted in Message Trace  
+3. Plug → Start / RFID tap  
+4. In Message Trace, confirm Authorize **Accepted**  
 
-### C. Multi-outlet parallel charge
+### C. Multi-outlet
 
 1. Commission with 2–4 connectors  
-2. Focus each outlet from **OUTLETS** on the HMI  
-3. Each active session needs its **own** accepted idTag  
+2. On the HMI open **OUTLETS** and select the gun you want  
+3. Each parallel session needs its own accepted idTag  
 
-### D. DC vs AC
+### D. Charge by money or time
 
-- Connector types like **CCS Combo 2 / CHAdeMO** → treated as **DC**  
-- **Mennekes T2 / Schuko / J1772** → **AC**  
-- Mixed outlets → **AC/DC**  
-- INFO page and Bench **Charger hardware** show the mode  
-
-### E. Fill by money / time
-
-1. Set tariff under Hardware  
-2. Car configuration → fill mode Money or Time  
-3. Set car config → start charging  
-4. Session auto-stops at the planned energy / time / full pack  
+1. Set tariff under Bench **Hardware**  
+2. Fill **Car configuration** (money or time mode)  
+3. **Set car config** → start charging  
+4. Session stops when the planned energy/time (or full pack) is reached  
 
 ---
 
-## 9. Troubleshooting
+## 10. Troubleshooting (website only)
 
-| Symptom | What to try |
-|---------|-------------|
-| Stays `connecting` / `reconnecting` | Check base URL + cpId; try with/without subprotocol; check Basic Auth if CMS requires it |
-| Boot never Accepted | CMS rejected identity / URL path; read System + OCPP tabs |
-| Authorize Invalid | Wrong idTag, or Auth = CMS only without a registered card |
-| UI looks old | Hard refresh (**Ctrl+Shift+R**) or private window (cached JS) |
-| Charger clipped in 3D | Scroll zoom out / orbit; default camera shows full pedestal |
-| Same cpId on laptop + Render | Both fight the CMS — use only one at a time |
-| Free Render sleeps | Wait ~1 min on first open after idle |
-
----
-
-## 10. Quick glossary
-
-| Term | Meaning |
-|------|---------|
-| **CMS / CSMS** | Central System that manages charge points |
-| **cpId** | Charge Point ID in the WebSocket path |
-| **idTag** | RFID / token used to authorize a session |
-| **Connector Cn** | Outlet number (C1, C2, …); C0 = station |
-| **BootNotification** | First OCPP hello after connect |
-| **MeterValues** | Live power / energy samples while charging |
-| **Basic Auth** | Optional WebSocket username/password (not RFID) |
-| **Firmware string** | Simulated version in BootNotification (lab identity) |
+| What you see | What to do |
+|--------------|------------|
+| Site blank / very slow first load | Wait ~1 minute (cold start), then refresh |
+| Stays **connecting** / **reconnecting** | Check base URL and Charge Point ID; try Basic Auth if required; try Reconnect with/without subprotocol |
+| **online** but no Boot Accepted | Open Message Trace → OCPP/System and read the reject reason |
+| Authorize **Invalid** | Wrong idTag, or Auth is CMS only without a registered card |
+| UI looks outdated | Hard refresh (**Ctrl+Shift+R**) or open a private/incognito window |
+| Same Charge Point ID open in two browsers/tabs | Use one only — duplicate IDs fight the CMS |
+| Charger looks cut off | Zoom out (scroll) or orbit until the full unit is in view |
 
 ---
 
-## 11. More docs
+## 11. Glossary
 
-| Doc | Audience |
-|-----|----------|
-| `docs/User-Guide.md` (this file) | New operators |
-| `docs/Massive-Mobility-Simulator-Guide.md` | How pieces connect |
-| `docs/OCPP-1.6-Guide.md` | OCPP 1.6 overview |
-| `docs/Tech-Stack-Flow-Guide.md` | Tech stack deep dive |
-| `README.md` | Install, deploy, feature list |
+| Term | Simple meaning |
+|------|----------------|
+| **CMS / CSMS** | The backend system that manages chargers |
+| **Charge Point ID** | ID of this virtual charger in the WebSocket path |
+| **idTag** | Card / token used to start a session |
+| **Connector / Cn** | Outlet number (C1, C2, …) |
+| **Basic Auth** | Optional WebSocket username/password (not the RFID) |
+| **BootNotification** | First hello the charger sends after connect |
+| **MeterValues** | Live power and energy samples while charging |
