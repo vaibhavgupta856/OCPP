@@ -453,7 +453,10 @@
 .controls-rail {
   background: #ffffff;
   border-right: 1px solid var(--steel);
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   max-height: calc(100vh - 72px - 72px);
   min-height: calc(100vh - 72px - 72px);
   box-shadow: inset -1px 0 0 transparent;
@@ -462,6 +465,11 @@
 .controls-rail {
   border-right: none;
   border-left: 1px solid var(--steel);
+}
+
+.controls-rail .action-bar {
+  min-height: min-content;
+  padding-bottom: 2rem;
 }
 
 .stage-wrap {
@@ -1266,11 +1274,10 @@
   color: var(--ink-muted, #6b7280);
 }
 .car-config-section {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background: #ffffff;
-  padding-top: 0.15rem;
+  position: static;
+  z-index: auto;
+  background: transparent;
+  padding-top: 0;
 }
 .car-config {
   display: flex;
