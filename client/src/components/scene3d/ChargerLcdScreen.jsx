@@ -84,12 +84,34 @@ export default function ChargerLcdScreen({
   const fwStatusRef = useRef(firmwareStatus);
   const tariffRef = useRef(tariff);
   const showButtonsRef = useRef(showButtons);
+  const lastPaintRef = useRef(0);
+  const forcePaintRef = useRef(true);
   pageRef.current = page;
   identityRef.current = identity;
   hardwareRef.current = hardware;
   fwStatusRef.current = firmwareStatus;
   tariffRef.current = tariff;
   showButtonsRef.current = showButtons;
+
+  useEffect(() => {
+    forcePaintRef.current = true;
+  }, [
+    page,
+    connectionState,
+    cpId,
+    busy,
+    showButtons,
+    connector?.number,
+    connector?.status,
+    connector?.transactionId,
+    connector?.cablePlugged,
+    connector?.meterWh,
+    connector?.powerW,
+    connector?.sessionCost,
+    connector?.soc,
+    connector?.idTag,
+    firmwareStatus,
+  ]);
 
   const { texture, ctx, canvas } = useMemo(() => {
     const c = document.createElement('canvas');
@@ -98,14 +120,21 @@ export default function ChargerLcdScreen({
     const context = c.getContext('2d');
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 4;
+    tex.anisotropy = 1;
     return { texture: tex, ctx: context, canvas: c };
   }, []);
 
   useEffect(() => () => texture.dispose(), [texture]);
 
-  useFrame(() => {
+  useFrame(({ clock }) => {
     if (!ctx || !canvas) return;
+    // Throttle HMI paints so camera orbit stays smooth (full redraw is expensive)
+    const now = clock.elapsedTime;
+    const minInterval = showButtonsRef.current ? 1 / 12 : 1 / 10;
+    if (!forcePaintRef.current && now - lastPaintRef.current < minInterval) return;
+    forcePaintRef.current = false;
+    lastPaintRef.current = now;
+
     const c = connector;
     const guns = (connectors || []).filter((x) => x.number > 0);
     const online = connectionState === 'online';

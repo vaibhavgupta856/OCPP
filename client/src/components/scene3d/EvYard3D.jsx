@@ -75,32 +75,23 @@ function SceneLights() {
         castShadow
         position={[7.5, 13, 6.5]}
         intensity={2.05}
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-        shadow-camera-far={30}
-        shadow-camera-left={-8}
-        shadow-camera-right={8}
-        shadow-camera-top={8}
-        shadow-camera-bottom={-8}
+        shadow-mapSize={[1024, 1024]}
+        shadow-camera-far={24}
+        shadow-camera-left={-6}
+        shadow-camera-right={6}
+        shadow-camera-top={6}
+        shadow-camera-bottom={-6}
         shadow-bias={-0.0002}
         color="#fff8f2"
       />
-      <directionalLight position={[-7, 6, -5]} intensity={0.85} color="#e8f0ff" />
-      <directionalLight position={[0, 8, 10]} intensity={0.7} color="#ffffff" />
+      <directionalLight position={[-7, 6, -5]} intensity={0.9} color="#e8f0ff" />
+      <directionalLight position={[0, 8, 10]} intensity={0.75} color="#ffffff" />
       <spotLight
         position={[1.5, 9, 7]}
         angle={0.38}
         penumbra={0.45}
-        intensity={1.6}
+        intensity={1.35}
         color="#ffffff"
-        castShadow={false}
-      />
-      <spotLight
-        position={[-2.5, 6, 5]}
-        angle={0.5}
-        penumbra={0.6}
-        intensity={0.9}
-        color="#ffe8e4"
         castShadow={false}
       />
     </>
@@ -173,11 +164,11 @@ function SceneContent(props) {
 
       <ContactShadows
         position={[0, 0.02, 0]}
-        opacity={0.28}
+        opacity={0.22}
         scale={12}
-        blur={2.8}
+        blur={2.2}
         far={6}
-        resolution={256}
+        resolution={128}
         frames={1}
         color="#1a1f28"
       />
@@ -186,7 +177,10 @@ function SceneContent(props) {
         makeDefault
         enablePan
         enableDamping
-        dampingFactor={0.08}
+        dampingFactor={0.16}
+        rotateSpeed={0.65}
+        zoomSpeed={0.8}
+        panSpeed={0.65}
         minPolarAngle={0.25}
         maxPolarAngle={1.45}
         minDistance={5}
@@ -209,12 +203,12 @@ export default function EvYard3D(props) {
       <Canvas
         shadows
         dpr={[1, 1.25]}
+        performance={{ min: 0.5 }}
         camera={{ position: FRONT_CAM, fov: 42, near: 0.5, far: 40 }}
         gl={{
           antialias: true,
           alpha: false,
           powerPreference: 'high-performance',
-          // logarithmicDepthBuffer causes panel flicker on some GPUs in production
           logarithmicDepthBuffer: false,
           toneMapping: THREE.ACESFilmicToneMapping,
           toneMappingExposure: 1.22,
