@@ -1,7 +1,11 @@
 .console-shell {
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100vh;
+  max-height: 100dvh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .console-top {
@@ -117,12 +121,20 @@
   grid-template-columns: 260px minmax(0, 1fr) 280px;
   gap: 0;
   min-height: 0;
+  overflow: hidden;
 }
 .console-body.yard-wide {
   grid-template-columns: 240px minmax(0, 1fr);
 }
 .console-body.with-bench {
-  grid-template-columns: 220px minmax(0, 1fr) 260px;
+  grid-template-columns: 220px minmax(0, 1fr) 280px;
+}
+
+.console-body > .rail,
+.console-body > .stage-wrap,
+.console-body > .controls-rail {
+  min-width: 0;
+  min-height: 0;
 }
 
 .stage-wrap.roomy {
@@ -457,8 +469,9 @@
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  max-height: calc(100vh - 72px - 72px);
-  min-height: calc(100vh - 72px - 72px);
+  min-height: 0;
+  max-height: none;
+  height: auto;
   box-shadow: inset -1px 0 0 transparent;
 }
 
@@ -469,7 +482,7 @@
 
 .controls-rail .action-bar {
   min-height: min-content;
-  padding-bottom: 2rem;
+  padding-bottom: 2.5rem;
 }
 
 .stage-wrap {
@@ -1282,12 +1295,14 @@
 .car-config {
   display: flex;
   flex-direction: column;
-  gap: 0.55rem;
-  margin-top: 0.35rem;
-  padding: 0.65rem 0.7rem;
+  gap: 0.45rem;
+  margin-top: 0.25rem;
+  padding: 0.55rem 0.6rem;
   border: 1px solid #e8b4ba;
   border-radius: 10px;
   background: #fff8f8;
+  max-height: none;
+  overflow: visible;
 }
 .car-config-title {
   margin: 0;
@@ -1305,7 +1320,7 @@
 }
 .fill-goal {
   margin: 0;
-  padding: 0.5rem 0.55rem 0.35rem;
+  padding: 0.45rem 0.5rem 0.3rem;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   background: #fff;
@@ -1318,11 +1333,11 @@
 }
 .fill-option {
   display: grid !important;
-  grid-template-columns: 18px minmax(0, 1fr) 5.5rem;
+  grid-template-columns: 18px minmax(0, 1fr) 4.75rem;
   align-items: center;
-  gap: 0.4rem;
-  margin-bottom: 0.35rem;
-  font-size: 0.78rem;
+  gap: 0.35rem;
+  margin-bottom: 0.3rem;
+  font-size: 0.74rem;
 }
 .fill-option input[type='number'] {
   width: 100%;
@@ -1689,11 +1704,13 @@
 @media (max-width: 1100px) {
   .console-body {
     grid-template-columns: 1fr;
+    overflow: auto;
   }
   .rail,
   .controls-rail {
     max-height: none;
     min-height: 0;
+    height: auto;
     border: none;
     border-bottom: 1px solid var(--steel);
   }

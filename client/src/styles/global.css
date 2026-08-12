@@ -49,6 +49,7 @@ html,
 body,
 #root {
   margin: 0;
+  height: 100%;
   min-height: 100%;
   background: var(--bg-deep);
   color: var(--text);
@@ -56,12 +57,17 @@ body,
 }
 
 body {
+  overflow: hidden;
   background-color: var(--bg-deep);
   background-image:
     radial-gradient(ellipse 70% 45% at 0% 0%, rgba(192, 36, 52, 0.06), transparent 55%),
     radial-gradient(ellipse 50% 40% at 100% 0%, rgba(253, 232, 233, 0.9), transparent 50%),
     linear-gradient(180deg, #f8f9fb 0%, #f3f4f6 100%);
   background-attachment: fixed;
+}
+
+#root {
+  overflow: hidden;
 }
 
 button,
