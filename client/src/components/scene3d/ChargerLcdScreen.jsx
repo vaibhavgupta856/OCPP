@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
-const W = 1280;
-const H = 960;
+const W = 1600;
+const H = 1200;
 
 function roundRect(ctx, x, y, w, h, r) {
   const radius = Math.min(r, w / 2, h / 2);
@@ -26,7 +26,7 @@ function drawBtn(ctx, x, y, w, h, label, { fill, text, active } = {}) {
     ctx.stroke();
   }
   ctx.fillStyle = text || '#fff5f6';
-  ctx.font = 'bold 50px system-ui, Segoe UI, sans-serif';
+  ctx.font = 'bold 60px system-ui, Segoe UI, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(label, x + w / 2, y + h / 2 + 1);
@@ -142,29 +142,29 @@ export default function ChargerLcdScreen({
     ctx.fillRect(0, 0, W, H);
 
     ctx.strokeStyle = '#5a2030';
-    ctx.lineWidth = 5;
-    ctx.strokeRect(10, 10, W - 20, H - 20);
+    ctx.lineWidth = 6;
+    ctx.strokeRect(12, 12, W - 24, H - 24);
 
     // top status bar
     ctx.fillStyle = '#2a1218';
-    ctx.fillRect(20, 20, W - 40, 100);
+    ctx.fillRect(24, 24, W - 48, 120);
     ctx.fillStyle = '#ffb3bb';
-    ctx.font = 'bold 54px system-ui, Segoe UI, sans-serif';
+    ctx.font = 'bold 68px system-ui, Segoe UI, sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillText('MASSIVE CHARGE POINT', 44, 70);
-    ctx.font = '34px monospace';
+    ctx.fillText('MASSIVE CHARGE POINT', 52, 84);
+    ctx.font = '42px monospace';
     ctx.fillStyle = '#e8a3aa';
     const id = String(cpId || 'CP');
-    ctx.fillText(id.length > 18 ? `${id.slice(0, 16)}…` : id, 560, 70);
-    ctx.font = 'bold 36px system-ui, Segoe UI, sans-serif';
+    ctx.fillText(id.length > 18 ? `${id.slice(0, 16)}…` : id, 700, 84);
+    ctx.font = 'bold 44px system-ui, Segoe UI, sans-serif';
     ctx.fillStyle = online ? '#ffb3bb' : '#ffb74d';
     ctx.textAlign = 'right';
-    ctx.fillText(online ? 'ONLINE' : String(connectionState || 'OFFLINE').toUpperCase(), W - 48, 70);
+    ctx.fillText(online ? 'ONLINE' : String(connectionState || 'OFFLINE').toUpperCase(), W - 56, 84);
 
     const withButtons = showButtonsRef.current;
-    const contentTop = 140;
-    const contentBottom = withButtons ? H - 240 : H - 48;
+    const contentTop = 168;
+    const contentBottom = withButtons ? H - 280 : H - 56;
 
     if (view === 'info') {
       const idn = identityRef.current || {};
@@ -174,11 +174,11 @@ export default function ChargerLcdScreen({
         mode === 'DC' ? 'DC fast charger' : mode === 'AC/DC' ? 'AC/DC mixed charger' : 'AC charger';
       ctx.textAlign = 'left';
       ctx.fillStyle = '#ffb3bb';
-      ctx.font = 'bold 48px system-ui, Segoe UI, sans-serif';
-      ctx.fillText('System / Hardware', 48, contentTop + 40);
+      ctx.font = 'bold 58px system-ui, Segoe UI, sans-serif';
+      ctx.fillText('System / Hardware', 56, contentTop + 48);
 
       ctx.fillStyle = '#f7e4e6';
-      ctx.font = '32px system-ui, Segoe UI, sans-serif';
+      ctx.font = '40px system-ui, Segoe UI, sans-serif';
       const leftLines = [
         `Vendor   ${idn.chargePointVendor || 'Massive Mobility'}`,
         `Model    ${idn.chargePointModel || 'Massive-CP-Sim-16'}`,
@@ -189,239 +189,237 @@ export default function ChargerLcdScreen({
         `Supply   ${hw.supply || '—'}`,
         `CPU      ${hw.cpuModel || '—'}`,
       ];
-      leftLines.forEach((line, i) => ctx.fillText(line, 48, contentTop + 86 + i * 40));
+      leftLines.forEach((line, i) => ctx.fillText(line, 56, contentTop + 104 + i * 48));
 
-      const tileY = contentTop + 420;
+      const tileY = contentTop + 510;
       const tiles = [
-        { x: 48, label: 'CPU LIVE', value: `${hw.cpuPercent != null ? hw.cpuPercent : '—'}%` },
+        { x: 56, label: 'CPU LIVE', value: `${hw.cpuPercent != null ? hw.cpuPercent : '—'}%` },
         {
-          x: 460,
+          x: 560,
           label: 'RAM',
           value: `${formatMem(hw.ramUsedMb)}/${formatMem(hw.ramTotalMb)}`,
         },
         {
-          x: 872,
+          x: 1064,
           label: 'CABINET',
           value: `${hw.tempC != null ? `${hw.tempC}°C` : '—'}`,
         },
       ];
       tiles.forEach((t) => {
         ctx.fillStyle = '#3a1a22';
-        roundRect(ctx, t.x, tileY, 360, 100, 14);
+        roundRect(ctx, t.x, tileY, 480, 120, 16);
         ctx.fill();
         ctx.fillStyle = '#e8a3aa';
-        ctx.font = '28px system-ui, Segoe UI, sans-serif';
-        ctx.fillText(t.label, t.x + 22, tileY + 34);
+        ctx.font = '34px system-ui, Segoe UI, sans-serif';
+        ctx.fillText(t.label, t.x + 28, tileY + 40);
         ctx.fillStyle = '#ffb3bb';
-        ctx.font = 'bold 42px monospace';
-        ctx.fillText(t.value, t.x + 22, tileY + 76);
+        ctx.font = 'bold 52px monospace';
+        ctx.fillText(t.value, t.x + 28, tileY + 90);
       });
 
       ctx.fillStyle = '#e8a3aa';
-      ctx.font = '30px system-ui, Segoe UI, sans-serif';
+      ctx.font = '36px system-ui, Segoe UI, sans-serif';
       ctx.fillText(
         `ROM ${formatMem(hw.romUsedMb)} / ${formatMem(hw.romTotalMb)}  ·  Module ${
           hw.moduleTempC != null ? `${hw.moduleTempC}°C` : '—'
         }  ·  Uptime ${formatUptime(hw.uptimeSec)}`,
-        48,
-        tileY + 128
+        56,
+        tileY + 152
       );
       ctx.fillText(
         `Cooling ${hw.cooling || '—'}  ·  OCPP 1.6J  ·  ${(tariffRef.current?.currencySymbol || '₹')}${rate.toFixed(2)}/kWh`,
-        48,
-        tileY + 164
+        56,
+        tileY + 196
       );
     } else if (view === 'connectors') {
       ctx.textAlign = 'left';
       ctx.fillStyle = '#ffb3bb';
-      ctx.font = 'bold 58px system-ui, Segoe UI, sans-serif';
-      ctx.fillText('Outlets', 48, contentTop + 52);
+      ctx.font = 'bold 70px system-ui, Segoe UI, sans-serif';
+      ctx.fillText('Outlets', 56, contentTop + 60);
       ctx.fillStyle = '#e8a3aa';
-      ctx.font = '34px system-ui, Segoe UI, sans-serif';
+      ctx.font = '42px system-ui, Segoe UI, sans-serif';
       ctx.fillText(
         withButtons ? 'Tap a row to focus that connector' : 'Connector status overview',
-        48,
-        contentTop + 102
+        56,
+        contentTop + 120
       );
       guns.forEach((g, i) => {
-        const y = contentTop + 128 + i * 108;
-        if (y + 94 > contentBottom) return;
+        const y = contentTop + 150 + i * 128;
+        if (y + 112 > contentBottom) return;
         const focused = g.number === c?.number;
         ctx.fillStyle = focused ? '#5a2030' : '#3a1a22';
-        roundRect(ctx, 48, y, W - 96, 96, 14);
+        roundRect(ctx, 56, y, W - 112, 112, 16);
         ctx.fill();
         if (focused) {
           ctx.strokeStyle = '#ffb3bb';
-          ctx.lineWidth = 4;
-          roundRect(ctx, 48, y, W - 96, 96, 14);
+          ctx.lineWidth = 5;
+          roundRect(ctx, 56, y, W - 112, 112, 16);
           ctx.stroke();
         }
         ctx.fillStyle = g.status === 'Charging' ? '#ffb3bb' : '#fff5f6';
-        ctx.font = 'bold 48px system-ui, Segoe UI, sans-serif';
-        ctx.fillText(`C${g.number}`, 72, y + 58);
-        ctx.font = '36px system-ui, Segoe UI, sans-serif';
+        ctx.font = 'bold 58px system-ui, Segoe UI, sans-serif';
+        ctx.fillText(`C${g.number}`, 84, y + 70);
+        ctx.font = '44px system-ui, Segoe UI, sans-serif';
         ctx.fillStyle = '#e8b0b6';
         ctx.fillText(
           `${g.name || `Connector ${g.number}`} · ${g.status} · ${g.powerKw} kW · ${g.cablePlugged ? 'PLUGGED' : 'IDLE'}`,
-          180,
-          y + 58
+          210,
+          y + 70
         );
       });
     } else if (view === 'session') {
       ctx.textAlign = 'left';
       ctx.fillStyle = '#ffb3bb';
-      ctx.font = 'bold 68px system-ui, Segoe UI, sans-serif';
-      ctx.fillText((c?.status || '—').toUpperCase(), 48, contentTop + 62);
+      ctx.font = 'bold 82px system-ui, Segoe UI, sans-serif';
+      ctx.fillText((c?.status || '—').toUpperCase(), 56, contentTop + 72);
       ctx.fillStyle = '#f0d0d4';
-      ctx.font = '40px system-ui, Segoe UI, sans-serif';
-      ctx.fillText(`Outlet C${c?.number ?? '—'} · Rated ${rated} kW`, 48, contentTop + 124);
+      ctx.font = '48px system-ui, Segoe UI, sans-serif';
+      ctx.fillText(`Outlet C${c?.number ?? '—'} · Rated ${rated} kW`, 56, contentTop + 148);
 
-      const tileW = 360;
-      const tileH = 178;
-      const tileY = contentTop + 156;
+      const tileW = 480;
+      const tileH = 210;
+      const tileY = contentTop + 184;
       [
-        { x: 48, label: 'ENERGY', value: `${kwh} kWh` },
-        { x: 460, label: 'POWER', value: `${kw} kW` },
-        { x: 872, label: 'COST', value: costText },
+        { x: 56, label: 'ENERGY', value: `${kwh} kWh` },
+        { x: 560, label: 'POWER', value: `${kw} kW` },
+        { x: 1064, label: 'COST', value: costText },
       ].forEach((t) => {
         ctx.fillStyle = '#3a1a22';
-        roundRect(ctx, t.x, tileY, tileW, tileH, 16);
+        roundRect(ctx, t.x, tileY, tileW, tileH, 18);
         ctx.fill();
         ctx.fillStyle = '#e8a3aa';
-        ctx.font = '34px system-ui, Segoe UI, sans-serif';
-        ctx.fillText(t.label, t.x + 28, tileY + 50);
+        ctx.font = '40px system-ui, Segoe UI, sans-serif';
+        ctx.fillText(t.label, t.x + 32, tileY + 58);
         ctx.fillStyle = '#ffb3bb';
-        ctx.font = 'bold 64px monospace';
-        ctx.fillText(t.value, t.x + 28, tileY + 126);
+        ctx.font = 'bold 76px monospace';
+        ctx.fillText(t.value, t.x + 32, tileY + 148);
       });
 
       ctx.fillStyle = '#3a1a22';
-      roundRect(ctx, 48, contentTop + 358, W - 96, 158, 16);
+      roundRect(ctx, 56, contentTop + 430, W - 112, 180, 18);
       ctx.fill();
       ctx.fillStyle = '#e8a3aa';
-      ctx.font = '32px system-ui, Segoe UI, sans-serif';
-      ctx.fillText(txLabel, 72, contentTop + 402);
-      ctx.fillText(tagLabel, 72, contentTop + 458);
+      ctx.font = '38px system-ui, Segoe UI, sans-serif';
+      ctx.fillText(txLabel, 84, contentTop + 484);
+      ctx.fillText(tagLabel, 84, contentTop + 550);
       ctx.fillStyle = '#ffb3bb';
-      ctx.font = 'bold 48px monospace';
-      ctx.fillText(txDisplay, 340, contentTop + 402);
-      ctx.fillText(tagDisplay, 340, contentTop + 458);
+      ctx.font = 'bold 56px monospace';
+      ctx.fillText(txDisplay, 400, contentTop + 484);
+      ctx.fillText(tagDisplay, 400, contentTop + 550);
 
       ctx.fillStyle = '#f0d0d4';
-      ctx.font = '34px system-ui, Segoe UI, sans-serif';
+      ctx.font = '42px system-ui, Segoe UI, sans-serif';
       ctx.fillText(
         `Rate  ${sym}${rate.toFixed(2)}/kWh  ·  SoC  ${c?.soc != null ? `${c.soc}%` : '—'}`,
-        48,
-        contentTop + 545
+        56,
+        contentTop + 650
       );
     } else {
       ctx.textAlign = 'left';
       ctx.fillStyle = '#ffb3bb';
-      ctx.font = 'bold 66px system-ui, Segoe UI, sans-serif';
-      ctx.fillText('Ready to charge', 48, contentTop + 56);
+      ctx.font = 'bold 80px system-ui, Segoe UI, sans-serif';
+      ctx.fillText('Ready to charge', 56, contentTop + 68);
       ctx.fillStyle = '#f0d0d4';
-      ctx.font = '38px system-ui, Segoe UI, sans-serif';
+      ctx.font = '46px system-ui, Segoe UI, sans-serif';
       ctx.fillText(
         withButtons
           ? 'Use the touch buttons below · or the RFID pad'
           : 'Outlet status and session meters',
-        48,
-        contentTop + 116
+        56,
+        contentTop + 140
       );
 
       ctx.fillStyle = '#3a1a22';
-      roundRect(ctx, 48, contentTop + 156, W - 96, 150, 16);
+      roundRect(ctx, 56, contentTop + 186, W - 112, 170, 18);
       ctx.fill();
       ctx.fillStyle = '#ffb3bb';
-      ctx.font = 'bold 56px system-ui, Segoe UI, sans-serif';
-      ctx.fillText((c?.status || 'Available').toUpperCase(), 80, contentTop + 226);
+      ctx.font = 'bold 68px system-ui, Segoe UI, sans-serif';
+      ctx.fillText((c?.status || 'Available').toUpperCase(), 92, contentTop + 268);
       ctx.fillStyle = '#e8b0b6';
-      ctx.font = '36px system-ui, Segoe UI, sans-serif';
+      ctx.font = '44px system-ui, Segoe UI, sans-serif';
       ctx.fillText(
         `${c?.name || `Outlet C${c?.number ?? '—'}`} · C${c?.number ?? '—'} · ${rated} kW`,
-        80,
-        contentTop + 274
+        92,
+        contentTop + 326
       );
 
       const tiles = [
-        { x: 48, label: 'ENERGY', value: `${kwh} kWh` },
-        { x: 460, label: 'POWER', value: `${kw} kW` },
-        { x: 872, label: 'COST', value: costText },
+        { x: 56, label: 'ENERGY', value: `${kwh} kWh` },
+        { x: 560, label: 'POWER', value: `${kw} kW` },
+        { x: 1064, label: 'COST', value: costText },
       ];
       tiles.forEach((t) => {
         ctx.fillStyle = '#2a1218';
-        roundRect(ctx, t.x, contentTop + 332, 360, 140, 14);
+        roundRect(ctx, t.x, contentTop + 396, 480, 168, 16);
         ctx.fill();
         ctx.fillStyle = '#e8a3aa';
-        ctx.font = '32px system-ui, Segoe UI, sans-serif';
-        ctx.fillText(t.label, t.x + 28, contentTop + 380);
+        ctx.font = '38px system-ui, Segoe UI, sans-serif';
+        ctx.fillText(t.label, t.x + 32, contentTop + 454);
         ctx.fillStyle = '#ffb3bb';
-        ctx.font = 'bold 52px monospace';
-        ctx.fillText(t.value, t.x + 28, contentTop + 438);
+        ctx.font = 'bold 64px monospace';
+        ctx.fillText(t.value, t.x + 32, contentTop + 524);
       });
 
       const fw = identityRef.current?.firmwareVersion || 'Massive-CPS-16.3.2.1';
       ctx.fillStyle = '#8aa89a';
-      ctx.font = '32px monospace';
+      ctx.font = '38px monospace';
       ctx.textAlign = 'left';
-      ctx.fillText(`FW ${fw}`, 48, contentBottom - 10);
+      ctx.fillText(`FW ${fw}`, 56, contentBottom - 12);
     }
 
     if (withButtons) {
-      // touch nav — only navigation (no duplicate physical page keys)
-      const navY = H - 220;
+      const navY = H - 260;
       const nav = [
         { id: 'home', label: 'HOME' },
         { id: 'session', label: 'SESSION' },
         { id: 'connectors', label: 'OUTLETS' },
         { id: 'info', label: 'INFO' },
       ];
-      const navGap = 14;
-      const navPad = 32;
+      const navGap = 18;
+      const navPad = 40;
       const navW = (W - navPad * 2 - navGap * (nav.length - 1)) / nav.length;
       nav.forEach((item, i) => {
         const x = navPad + i * (navW + navGap);
         const active = view === item.id;
-        drawBtn(ctx, x, navY, navW, 82, item.label, {
+        drawBtn(ctx, x, navY, navW, 96, item.label, {
           fill: active ? '#c02434' : '#9b1c2a',
           text: '#ffffff',
           active,
         });
-        zones.push({ id: `page:${item.id}`, x: x - 4, y: navY - 4, w: navW + 8, h: 90 });
+        zones.push({ id: `page:${item.id}`, x: x - 4, y: navY - 4, w: navW + 8, h: 104 });
       });
 
-      // action touch row — PLUG / START / STOP / CLEAR (RFID is the physical pad only)
-      const actY = H - 118;
+      const actY = H - 140;
       const actions = [
-        { id: 'plug', label: plugged ? 'UNPLUG' : 'PLUG', fill: '#6b3038', w: 280 },
-        { id: 'start', label: 'START', fill: '#c02434', disabled: busy || isTx, w: 280 },
-        { id: 'stop', label: 'STOP', fill: '#4b5563', disabled: busy || !isTx, w: 280 },
+        { id: 'plug', label: plugged ? 'UNPLUG' : 'PLUG', fill: '#6b3038', w: 350 },
+        { id: 'start', label: 'START', fill: '#c02434', disabled: busy || isTx, w: 350 },
+        { id: 'stop', label: 'STOP', fill: '#4b5563', disabled: busy || !isTx, w: 350 },
         {
           id: 'clear',
           label: 'CLEAR',
           fill: '#b45309',
           disabled: busy || c?.status !== 'Faulted',
-          w: 280,
+          w: 350,
         },
       ];
-      let ax = 36;
-      const gap = (W - 72 - actions.reduce((s, a) => s + a.w, 0)) / (actions.length - 1);
+      let ax = 44;
+      const gap = (W - 88 - actions.reduce((s, a) => s + a.w, 0)) / (actions.length - 1);
       actions.forEach((item) => {
         const bw = item.w;
         const disabled = !!item.disabled;
-        drawBtn(ctx, ax, actY, bw, 86, item.label, {
+        drawBtn(ctx, ax, actY, bw, 100, item.label, {
           fill: disabled ? '#3f3f46' : item.fill,
           text: disabled ? '#a1a1aa' : '#ffffff',
         });
-        if (!disabled) zones.push({ id: item.id, x: ax - 2, y: actY - 2, w: bw + 4, h: 90 });
+        if (!disabled) zones.push({ id: item.id, x: ax - 2, y: actY - 2, w: bw + 4, h: 104 });
         ax += bw + gap;
       });
 
       if (view === 'connectors') {
         guns.forEach((g, i) => {
-          const y = contentTop + 128 + i * 108;
-          if (y + 94 > contentBottom) return;
-          zones.push({ id: `outlet:${g.number}`, x: 44, y: y - 2, w: W - 88, h: 100 });
+          const y = contentTop + 150 + i * 128;
+          if (y + 112 > contentBottom) return;
+          zones.push({ id: `outlet:${g.number}`, x: 52, y: y - 2, w: W - 104, h: 116 });
         });
       }
     }
