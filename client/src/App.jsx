@@ -29,7 +29,8 @@ export default function App() {
   const [idTag, setIdTag] = useState('CARD-7F2A91');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [benchOpen, setBenchOpen] = useState(true);
+  /* Closed in preview so the 3D yard uses the full center width */
+  const [benchOpen, setBenchOpen] = useState(false);
   const {
     layout,
     setLeftWidth,
@@ -53,6 +54,10 @@ export default function App() {
   const cmsOnline = selected?.connectionState === 'online';
   const stageCharger = selected || PREVIEW_CHARGER;
   const controlsEnabled = !!cmsOnline;
+
+  useEffect(() => {
+    if (controlsEnabled) setBenchOpen(true);
+  }, [controlsEnabled]);
 
   const gridColumns = useMemo(() => {
     const parts = [];

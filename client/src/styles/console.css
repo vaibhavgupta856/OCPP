@@ -730,9 +730,16 @@
   padding: 0.5rem 0;
 }
 
-/* Cabinet stage */
+/* Cabinet stage — full center column (3D yard needs the width) */
 .charger-stage {
-  width: min(560px, 100%);
+  width: 100%;
+  max-width: none;
+}
+.charger-stage.roomy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
 }
 .charger-stage.is-reconnecting .cabinet {
   animation: reconnect-glow 1.8s ease-in-out infinite;
