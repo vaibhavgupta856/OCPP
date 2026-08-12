@@ -65,13 +65,17 @@ export default function ActionBar({
     charger?.connectors?.find((c) => c.number === connectorId)?.powerKw ?? charger?.powerKw ?? 22
   );
   const [connName, setConnName] = useState(`Connector ${connectorId}`);
-  const [soc, setSoc] = useState(20);
+  const [energyIn, setEnergyIn] = useState(12);
   const [battery, setBattery] = useState(60);
   const [rate, setRate] = useState(charger?.energyRatePerKwh ?? 18.5);
 
   const connector = charger?.connectors?.find((c) => c.number === connectorId);
   const setIdTag = onIdTagChange || (() => {});
   const sym = charger?.currencySymbol || '₹';
+  const packKwh = Math.max(0.1, Number(battery) || 0.1);
+  const inKwh = Math.max(0, Math.min(packKwh, Number(energyIn) || 0));
+  const toFullKwh = Math.max(0, packKwh - inKwh);
+  const socPct = (inKwh / packKwh) * 100;
 
   useEffect(() => {
     if (connector?.powerKw != null) setPower(connector.powerKw);
@@ -278,32 +282,37 @@ export default function ActionBar({
           </div>
         </label>
         <label>
-          SoC / Battery kWh
+          Car battery (kWh in car / capacity)
           <div className="inline-apply">
             <input
               type="number"
               min="0"
-              max="100"
-              value={soc}
-              onChange={(e) => setSoc(e.target.value)}
-              title="SoC %"
+              max="500"
+              step="0.1"
+              value={energyIn}
+              onChange={(e) => setEnergyIn(e.target.value)}
+              title="Energy already in the car battery (kWh)"
             />
             <input
               type="number"
-              min="1"
-              max="200"
+              min="0.1"
+              max="500"
+              step="0.1"
               value={battery}
               onChange={(e) => setBattery(e.target.value)}
-              title="Battery kWh"
+              title="Full battery capacity (kWh)"
             />
             <button
               type="button"
               disabled={busy}
-              onClick={() => onSoc(Number(soc), Number(battery))}
+              onClick={() => onSoc(inKwh, packKwh)}
             >
               Set
             </button>
           </div>
+          <small className="hint">
+            SoC ~ {socPct.toFixed(0)}% · energy to full ~ {toFullKwh.toFixed(2)} kWh
+          </small>
         </label>
       </section>
 

@@ -1259,6 +1259,12 @@
   flex: 1;
   min-width: 0;
 }
+.action-bar .hint {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.72rem;
+  color: var(--ink-muted, #6b7280);
+}
 .link-error {
   color: var(--signal-red);
   font-size: 0.72rem;

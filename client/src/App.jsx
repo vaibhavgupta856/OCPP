@@ -248,8 +248,8 @@ export default function App() {
               onPower={(powerKw) =>
                 act('/power', { connectorId: activeConnector, powerKw })
               }
-              onSoc={(soc, batteryKwh) =>
-                act('/soc', { connectorId: activeConnector, soc, batteryKwh })
+              onSoc={(energyKwh, batteryKwh) =>
+                act('/soc', { connectorId: activeConnector, energyKwh, batteryKwh })
               }
               onReconnect={(requireSubprotocol) => act('/reconnect', { requireSubprotocol })}
               onReset={(type) => act('/reset', { type })}

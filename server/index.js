@@ -197,6 +197,7 @@ app.post('/api/chargers/:cpId/soc', (req, res) =>
     cp.updateSocSettings(Number(req.body.connectorId), {
       soc: req.body.soc !== undefined ? Number(req.body.soc) : undefined,
       batteryKwh: req.body.batteryKwh !== undefined ? Number(req.body.batteryKwh) : undefined,
+      energyKwh: req.body.energyKwh !== undefined ? Number(req.body.energyKwh) : undefined,
     });
   })
 );

@@ -1613,7 +1613,16 @@ export class ChargePoint {
         const snap = meter.snapshot();
         c.meterWh = snap.meterWh;
         c.powerW = snap.powerW;
+        if (snap.soc != null) c.soc = snap.soc;
         this.broadcastState();
+
+        // EV pack full → stop the session (energy delivered ≈ remaining headroom)
+        if (snap.full && c.transactionId && c.status === ConnectorStatus.Charging) {
+          this.endTransaction(connectorId, 'Local').catch((err) =>
+            this.log('warn', `Auto-stop on full SoC failed: ${err.message}`, { connectorId })
+          );
+          return;
+        }
       }
 
       sinceOcppMs += uiMs;
@@ -1767,11 +1776,22 @@ export class ChargePoint {
     this.broadcastState();
   }
 
-  updateSocSettings(connectorId, { soc, batteryKwh } = {}) {
+  updateSocSettings(connectorId, { soc, batteryKwh, energyKwh } = {}) {
     const meter = this.meters.get(connectorId);
     if (!meter) return;
-    if (soc !== undefined) meter.setSoc(soc);
     if (batteryKwh !== undefined) meter.setBatteryKwh(batteryKwh);
+    if (energyKwh !== undefined && meter.batteryKwh > 0) {
+      meter.setSoc((Number(energyKwh) / meter.batteryKwh) * 100);
+    } else if (soc !== undefined) {
+      meter.setSoc(soc);
+    }
+    const c = this.getConnector(connectorId);
+    if (c && meter.soc != null) c.soc = meter.soc;
+    this.log(
+      'info',
+      `Battery set: SoC ${meter.soc.toFixed(1)}% · pack ${meter.batteryKwh} kWh · to full ${meter.remainingKwh().toFixed(3)} kWh`,
+      { connectorId }
+    );
     this.broadcastState();
   }
 
