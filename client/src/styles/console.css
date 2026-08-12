@@ -164,8 +164,8 @@
 .ev-yard-3d.roomy {
   width: 100%;
   flex: 0 0 auto;
-  height: min(58vh, 560px);
-  min-height: 360px;
+  height: min(74vh, 760px);
+  min-height: 520px;
   border-radius: 16px;
 }
 .yard-loading {
@@ -459,8 +459,8 @@
     grid-template-columns: 1fr;
   }
   .ev-yard-3d.roomy {
-    height: min(48vh, 420px);
-    min-height: 300px;
+    height: min(62vh, 560px);
+    min-height: 400px;
   }
 }
 
