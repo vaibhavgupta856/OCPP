@@ -200,11 +200,6 @@
   }
 }
 
-.stage-toolbar {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-}
 .multi-chips {
   display: flex;
   flex-wrap: wrap;
@@ -1053,13 +1048,6 @@
 }
 
 /* Interactive stage extras */
-.stage-hint {
-  margin: 0 0 0.75rem;
-  text-align: center;
-  color: var(--text-dim);
-  font-size: 0.78rem;
-}
-
 .ev-yard-3d {
   width: 100%;
   height: min(380px, 46vh);
