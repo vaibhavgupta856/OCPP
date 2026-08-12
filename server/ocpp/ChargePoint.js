@@ -106,6 +106,11 @@ export class ChargePoint {
     this.reconnectAttempt = 0;
     this.reconnectTimer = null;
     this.heartbeatTimer = null;
+    this.wsPingTimer = null;
+    this._connecting = false;
+    this._connectGen = 0;
+    this._suppressCloseReconnect = false;
+    this._openedAt = 0;
     this.meterTimers = new Map();
     this.pending = new Map();
     this.authCache = new Map();
@@ -245,6 +250,7 @@ export class ChargePoint {
     this.shouldRun = false;
     this._clearReconnect();
     this._stopHeartbeat();
+    this._stopWsPing();
     this._stopAllMeters();
     if (this.firmware?.updateTimer) {
       clearTimeout(this.firmware.updateTimer);
@@ -253,25 +259,72 @@ export class ChargePoint {
     for (const t of this.reservationTimers.values()) clearTimeout(t);
     this.reservationTimers.clear();
 
-    if (this.ws) {
-      try {
-        this.ws.removeAllListeners();
-        this.ws.close();
-      } catch {
-        /* ignore */
-      }
-      this.ws = null;
-    }
+    this._disposeSocket({ suppressReconnect: true });
     this.connectionState = 'offline';
     this.bootAccepted = false;
+    this._connecting = false;
     if (!silent) this.broadcastState();
+  }
+
+  _disposeSocket({ suppressReconnect = true } = {}) {
+    if (!this.ws) return;
+    const ws = this.ws;
+    this.ws = null;
+    this._stopWsPing();
+    this._suppressCloseReconnect = suppressReconnect;
+    try {
+      ws.removeAllListeners();
+      ws.on('error', () => {});
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+        ws.close(1000, 'client-replace');
+      }
+    } catch {
+      /* ignore */
+    }
+    // close handler may fire sync/async; keep suppress briefly
+    setTimeout(() => {
+      this._suppressCloseReconnect = false;
+    }, 250);
+  }
+
+  _startWsPing() {
+    this._stopWsPing();
+    // Keepalive through reverse proxies / CMS idle timeouts (Render + cloud WS)
+    this.wsPingTimer = setInterval(() => {
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+      try {
+        this.ws.ping();
+      } catch (err) {
+        this.log('warn', `WS ping failed: ${err.message}`);
+      }
+    }, 25_000);
+  }
+
+  _stopWsPing() {
+    if (this.wsPingTimer) {
+      clearInterval(this.wsPingTimer);
+      this.wsPingTimer = null;
+    }
   }
 
   async connect() {
     if (!this.shouldRun) return;
+    if (this._connecting) {
+      this.log('info', 'Connect already in progress — skip duplicate');
+      return;
+    }
+
+    this._connecting = true;
+    this._clearReconnect();
+    const gen = ++this._connectGen;
+
+    // Always drop any previous socket before opening a new one (avoids twin sockets fighting CMS)
+    this._disposeSocket({ suppressReconnect: true });
+    this._stopHeartbeat();
 
     this.connectionState = this.reconnectAttempt > 0 ? 'reconnecting' : 'connecting';
     this.lastError = null;
+    this.bootAccepted = false;
     this.broadcastState();
 
     const headers = {};
@@ -285,13 +338,22 @@ export class ChargePoint {
     const wsOptions = {
       headers,
       handshakeTimeout: 15000,
+      // Helpful through some proxies
+      perMessageDeflate: false,
     };
 
-    this.log('info', `Connecting to ${this.websocketUrl}${this.requireSubprotocol ? ' [ocpp1.6]' : ' [no subprotocol]'}`);
+    this.log(
+      'info',
+      `Connecting to ${this.websocketUrl}${this.requireSubprotocol ? ' [ocpp1.6]' : ' [no subprotocol]'} (attempt ${this.reconnectAttempt + 1})`
+    );
 
     try {
       await new Promise((resolve, reject) => {
-        // `ws` takes protocols as the 2nd arg (not options.protocol)
+        if (gen !== this._connectGen || !this.shouldRun) {
+          reject(new Error('Connect cancelled'));
+          return;
+        }
+
         const ws = this.requireSubprotocol
           ? new WebSocket(this.websocketUrl, 'ocpp1.6', wsOptions)
           : new WebSocket(this.websocketUrl, wsOptions);
@@ -323,18 +385,31 @@ export class ChargePoint {
 
         const onOpen = () => {
           cleanup();
+          if (gen !== this._connectGen || !this.shouldRun) {
+            try {
+              ws.close();
+            } catch {
+              /* ignore */
+            }
+            reject(new Error('Connect superseded'));
+            return;
+          }
+
           this.ws = ws;
+          this._openedAt = Date.now();
           this.connectionState = 'online';
-          this.reconnectAttempt = 0;
+          // Do NOT reset reconnectAttempt until BootNotification Accepted —
+          // resetting on bare WS open causes a fast reconnect loop when CMS drops us.
           this.log('info', 'WebSocket open');
           this.broadcastState();
 
           ws.on('message', (data) => this._onWsMessage(data));
-          ws.on('close', (code, reason) => this._onWsClose(code, reason?.toString?.() || ''));
+          ws.on('close', (code, reason) => this._onWsClose(code, reason?.toString?.() || '', gen));
           ws.on('error', (err) => {
             this.lastError = err.message;
             this.log('error', `WS error: ${err.message}`);
           });
+          this._startWsPing();
 
           resolve();
         };
@@ -348,39 +423,91 @@ export class ChargePoint {
       this.connectionState = 'offline';
       this.log('error', `Connect failed: ${err.message}`);
       this.broadcastState();
-      this._scheduleReconnect();
+      this._connecting = false;
+      if (this.shouldRun && gen === this._connectGen) this._scheduleReconnect();
       return;
     }
 
     try {
-      await this.sendBootNotification();
-      this.normalizeIdleStatuses();
-      await this.sendAllStatusNotifications();
-      await this.announceConnectors();
-      this.restartHeartbeat();
+      if (gen !== this._connectGen || !this.shouldRun) return;
+
+      const conf = await this.sendBootNotification();
+      if (gen !== this._connectGen || !this.shouldRun) return;
+
+      if (conf?.status === 'Accepted') {
+        this.reconnectAttempt = 0;
+        this.normalizeIdleStatuses();
+        await this.sendAllStatusNotifications();
+        await this.announceConnectors();
+        this.restartHeartbeat();
+      } else if (conf?.status === 'Pending') {
+        this.reconnectAttempt = 0;
+        this.log(
+          'warn',
+          'BootNotification Pending — staying online; waiting for CMS (do not open the same cpId from localhost + Render together)'
+        );
+        this.restartHeartbeat();
+      } else {
+        this.lastError = `BootNotification ${conf?.status || 'failed'}`;
+        this.log('warn', `Boot not accepted (${conf?.status}) — will reconnect with backoff`);
+        this._disposeSocket({ suppressReconnect: true });
+        this.connectionState = 'reconnecting';
+        this.broadcastState();
+        this._scheduleReconnect();
+      }
     } catch (err) {
       this.lastError = err.message;
       this.log('error', `Post-connect bootstrap failed: ${err.message}`);
+      // Connection may still be up; if CMS dropped us, close handler will reconnect.
+      // If socket still open but boot timed out, reconnect cleanly.
+      if (this.ws && this.ws.readyState === WebSocket.OPEN && this.shouldRun) {
+        this._disposeSocket({ suppressReconnect: true });
+        this.connectionState = 'reconnecting';
+        this.broadcastState();
+        this._scheduleReconnect();
+      }
+    } finally {
+      this._connecting = false;
     }
   }
 
-  _onWsClose(code, reason) {
-    this.log('warn', `WebSocket closed (${code}) ${reason}`);
+  _onWsClose(code, reason, gen) {
+    // Ignore closes from superseded / intentionally replaced sockets
+    if (gen != null && gen !== this._connectGen) return;
+    if (this._suppressCloseReconnect && !this.ws) {
+      this.log('info', `WebSocket closed during replace (${code}) ${reason || ''}`.trim());
+      return;
+    }
+
+    this.log('warn', `WebSocket closed (${code}) ${reason || ''}`.trim());
     this.ws = null;
     this.bootAccepted = false;
     this._stopHeartbeat();
+    this._stopWsPing();
     this._stopAllMeters();
+
+    const livedMs = this._openedAt ? Date.now() - this._openedAt : 0;
+    if (livedMs > 0 && livedMs < 5000) {
+      this.log(
+        'warn',
+        `Connection lived only ${Math.round(livedMs / 1000)}s — often CMS rejecting this cpId, auth mismatch, or the same charger connected from another place (local + deployed)`
+      );
+    }
+
     this.connectionState = this.shouldRun ? 'reconnecting' : 'offline';
     this.broadcastState();
-    if (this.shouldRun) this._scheduleReconnect();
+    if (this.shouldRun && !this._connecting) this._scheduleReconnect();
   }
 
   _scheduleReconnect() {
     this._clearReconnect();
     if (!this.shouldRun) return;
-    const delay = Math.min(30_000, 1000 * 2 ** Math.min(this.reconnectAttempt, 5));
+    // Cap at 60s — avoids hammering CMS when it keeps dropping us
+    const delay = Math.min(60_000, 1500 * 2 ** Math.min(this.reconnectAttempt, 5));
     this.reconnectAttempt += 1;
     this.log('info', `Reconnect in ${Math.round(delay / 1000)}s (attempt ${this.reconnectAttempt})`);
+    this.connectionState = 'reconnecting';
+    this.broadcastState();
     this.reconnectTimer = setTimeout(() => {
       this.connect().catch(() => {});
     }, delay);
