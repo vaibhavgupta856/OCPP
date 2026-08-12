@@ -48,9 +48,17 @@ export default function CanvasLabel({
   }, [text, fontSize, color, bg, maxWidthRatio]);
 
   return (
-    <mesh position={position}>
+    <mesh position={position} renderOrder={2}>
       <planeGeometry args={[width, height]} />
-      <meshBasicMaterial map={texture} transparent depthWrite={false} toneMapped={false} />
+      {/* alphaTest + depthWrite avoids transparent-sort flicker while orbiting */}
+      <meshBasicMaterial
+        map={texture}
+        transparent
+        alphaTest={0.15}
+        depthWrite
+        depthTest
+        toneMapped={false}
+      />
     </mesh>
   );
 }

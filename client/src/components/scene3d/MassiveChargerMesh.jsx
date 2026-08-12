@@ -280,9 +280,12 @@ function EvGunHolster({
 
   const wingW = 0.38;
   const wingD = bodyD * 0.9;
-  const gap = 0.012;
+  const gap = 0.02;
   const x = side * (bodyW / 2 + gap + wingW / 2);
-  const frontZ = wingD / 2 + 0.012;
+  // Recessed body front so the faceplate never shares a depth plane with the wing box
+  const wingBodyD = wingD - 0.08;
+  const wingBodyZ = -0.03;
+  const frontZ = wingD / 2 + 0.05;
   const s = side;
 
   const dockedPos = useMemo(() => new THREE.Vector3(0, 0.16, frontZ + 0.12), [frontZ]);
@@ -475,48 +478,42 @@ function EvGunHolster({
 
   return (
     <group position={[x, y, 0]}>
-      <mesh castShadow receiveShadow>
-        <boxGeometry args={[wingW, 1.55, wingD]} />
-        <meshPhysicalMaterial
+      {/* Wing shell — shorter in Z so front face stays behind the white plate */}
+      <mesh position={[0, 0, wingBodyZ]} castShadow receiveShadow>
+        <boxGeometry args={[wingW, 1.55, wingBodyD]} />
+        <meshStandardMaterial
           map={bodyMap}
           color={cabinet}
-          metalness={0.84}
-          roughness={0.16}
-          clearcoat={0.7}
-          envMapIntensity={1.6}
-          polygonOffset
-          polygonOffsetFactor={2}
-          polygonOffsetUnits={2}
+          metalness={0.72}
+          roughness={0.28}
+          envMapIntensity={1.15}
         />
       </mesh>
 
-      <mesh position={[s * (wingW / 2 - 0.02), 0.05, 0]} castShadow>
-        <boxGeometry args={[0.04, 1.4, wingD * 0.88]} />
+      {/* Outer / inner edge trims sit OUTSIDE the wing (no coplanar z-fight) */}
+      <mesh position={[s * (wingW / 2 + 0.014), 0.05, wingBodyZ]} castShadow>
+        <boxGeometry args={[0.028, 1.4, wingBodyD * 0.9]} />
         <meshStandardMaterial color={deep} metalness={0.75} roughness={0.32} />
       </mesh>
 
-      <mesh position={[-s * (wingW / 2 - 0.012), 0.02, 0]} castShadow>
-        <boxGeometry args={[0.018, 1.5, wingD * 0.96]} />
+      <mesh position={[-s * (wingW / 2 + 0.01), 0.02, wingBodyZ]} castShadow>
+        <boxGeometry args={[0.02, 1.5, wingBodyD * 0.94]} />
         <meshStandardMaterial color="#0a0c10" metalness={0.65} roughness={0.4} />
       </mesh>
 
-      <mesh position={[0, -0.86, 0]} castShadow receiveShadow>
-        <boxGeometry args={[wingW + 0.05, 0.16, wingD * 0.94]} />
+      <mesh position={[0, -0.88, wingBodyZ]} castShadow receiveShadow>
+        <boxGeometry args={[wingW + 0.06, 0.14, wingBodyD * 0.92]} />
         <meshStandardMaterial color={deep} metalness={0.88} roughness={0.28} />
       </mesh>
 
-      <mesh position={[0, 0.05, frontZ + 0.01]} castShadow>
-        <boxGeometry args={[wingW - 0.06, 1.36, 0.028]} />
-        <meshPhysicalMaterial
+      {/* Faceplate clearly in front of the wing body */}
+      <mesh position={[0, 0.05, frontZ]} castShadow>
+        <boxGeometry args={[wingW - 0.05, 1.34, 0.022]} />
+        <meshStandardMaterial
           color="#eef1f5"
-          metalness={0.18}
-          roughness={0.1}
-          clearcoat={1}
-          clearcoatRoughness={0.05}
-          envMapIntensity={1.55}
-          polygonOffset
-          polygonOffsetFactor={-1}
-          polygonOffsetUnits={-1}
+          metalness={0.12}
+          roughness={0.22}
+          envMapIntensity={0.85}
         />
       </mesh>
 
@@ -648,13 +645,13 @@ function EvGunHolster({
         <meshStandardMaterial color={deep} metalness={0.82} roughness={0.28} />
       </mesh>
 
-      <mesh position={[0, -0.62, frontZ + 0.03]} castShadow>
-        <boxGeometry args={[0.28, 0.14, 0.02]} />
-        <meshPhysicalMaterial color="#ffffff" metalness={0.1} roughness={0.25} clearcoat={0.6} />
+      <mesh position={[0, -0.62, frontZ + 0.02]} castShadow>
+        <boxGeometry args={[0.28, 0.14, 0.018]} />
+        <meshStandardMaterial color="#ffffff" metalness={0.08} roughness={0.35} />
       </mesh>
       <CanvasLabel
         text={label}
-        position={[0, -0.58, frontZ + 0.05]}
+        position={[0, -0.58, frontZ + 0.04]}
         width={0.26}
         height={0.05}
         fontSize={42}
@@ -662,7 +659,7 @@ function EvGunHolster({
       />
       <CanvasLabel
         text={`${powerKw} kW`}
-        position={[0, -0.68, frontZ + 0.05]}
+        position={[0, -0.68, frontZ + 0.04]}
         width={0.26}
         height={0.04}
         fontSize={30}
@@ -670,7 +667,7 @@ function EvGunHolster({
       />
       <CanvasLabel
         text={charging ? 'CHARGING' : plugged ? 'IN USE' : 'READY'}
-        position={[0, -0.78, frontZ + 0.05]}
+        position={[0, -0.78, frontZ + 0.04]}
         width={0.28}
         height={0.035}
         fontSize={24}
@@ -806,20 +803,16 @@ export default function MassiveChargerMesh({
         />
       </mesh>
 
-      {/* Slightly inset glossy white HMI face */}
-      <mesh position={[0, bodyY + 0.08, bodyD / 2 - 0.02]} castShadow>
-        <boxGeometry args={[bodyW - 0.1, bodyH - 0.35, 0.05]} />
-        <meshPhysicalMaterial
+      {/* Slightly proud glossy white HMI face (clear of cabinet front plane) */}
+      <mesh position={[0, bodyY + 0.08, bodyD / 2 + 0.028]} castShadow>
+        <boxGeometry args={[bodyW - 0.12, bodyH - 0.38, 0.04]} />
+        <meshStandardMaterial
           map={surfaces.face.map}
           roughnessMap={surfaces.face.roughnessMap}
           color={white}
-          metalness={0.28}
-          roughness={0.07}
-          clearcoat={1}
-          clearcoatRoughness={0.04}
-          sheen={0.4}
-          sheenColor="#ffffff"
-          envMapIntensity={1.65}
+          metalness={0.18}
+          roughness={0.14}
+          envMapIntensity={1.1}
         />
       </mesh>
 

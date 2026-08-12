@@ -205,12 +205,13 @@ export default function EvYard3D(props) {
     <div className="ev-yard-3d roomy">
       <Canvas
         shadows
-        dpr={[1, 1.75]}
-        camera={{ position: FRONT_CAM, fov: 44, near: 0.1, far: 80 }}
+        dpr={[1, 1.5]}
+        camera={{ position: FRONT_CAM, fov: 44, near: 0.35, far: 60 }}
         gl={{
           antialias: true,
           alpha: false,
           powerPreference: 'high-performance',
+          logarithmicDepthBuffer: true,
           toneMapping: THREE.ACESFilmicToneMapping,
           toneMappingExposure: 1.22,
         }}
