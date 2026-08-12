@@ -1072,8 +1072,8 @@ export default function MassiveChargerMesh({
         onSelectOutlet={onSelectOutlet}
       />
 
-      {/* Larger display-only HMI clone — lower beside mid cabinet, no frame */}
-      <group visible={lcdPeek} position={[bodyW / 2 + 1.65, 1.45, bodyD / 2 + 0.05]}>
+      {/* Larger display-only HMI clone — beside cabinet, slightly above mid */}
+      <group visible={lcdPeek} position={[bodyW / 2 + 1.65, 1.85, bodyD / 2 + 0.05]}>
         <ChargerLcdScreen
           connector={active}
           connectors={connectors}
@@ -1084,7 +1084,7 @@ export default function MassiveChargerMesh({
           hardware={hardware}
           tariff={tariff}
           position={[0, 0, 0.02]}
-          size={[2.05, 1.55]}
+          size={[1.95, 1.48]}
           page={page}
           busy={busy}
           showButtons={false}
@@ -1102,9 +1102,9 @@ export default function MassiveChargerMesh({
         onClick={() => onTapCard?.(active?.number)}
       />
 
-      {/* Brand kick plate — large readable EV CHARGER mark */}
-      <mesh position={[0, 0.52, bodyD / 2 + 0.055]} castShadow>
-        <boxGeometry args={[bodyW - 0.08, 0.52, 0.05]} />
+      {/* Brand kick plate */}
+      <mesh position={[0, 0.55, bodyD / 2 + 0.055]} castShadow>
+        <boxGeometry args={[bodyW - 0.12, 0.34, 0.04]} />
         <meshPhysicalMaterial
           map={surfaces.accentMap.map}
           color={accent}
@@ -1116,19 +1116,19 @@ export default function MassiveChargerMesh({
       </mesh>
       <CanvasLabel
         text="EV CHARGER"
-        position={[0, 0.52, bodyD / 2 + 0.095]}
-        width={bodyW - 0.16}
-        height={0.34}
-        fontSize={140}
+        position={[0, 0.55, bodyD / 2 + 0.09]}
+        width={bodyW - 0.22}
+        height={0.16}
+        fontSize={72}
         color="#ffffff"
-        maxWidthRatio={0.96}
+        maxWidthRatio={0.94}
       />
       <CanvasLabel
         text={`C${active?.number || 1} · ${active?.status || ''}`}
-        position={[0, 0.2, bodyD / 2 + 0.09]}
-        width={0.95}
-        height={0.1}
-        fontSize={44}
+        position={[0, 0.3, bodyD / 2 + 0.085]}
+        width={0.8}
+        height={0.07}
+        fontSize={32}
         color="#e8a3aa"
       />
 
