@@ -9,6 +9,9 @@ import { usePanelLayout } from './hooks/usePanelLayout.js';
 import { PREVIEW_CHARGER } from './previewCharger.js';
 import './styles/console.css';
 
+/* Injected at build time by Vite (see vite.config.js) */
+const APP_BUILD = typeof __APP_BUILD__ !== 'undefined' ? __APP_BUILD__ : 'dev';
+
 const api = async (path, options = {}) => {
   const res = await fetch(path, {
     headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
@@ -195,7 +198,9 @@ export default function App() {
           </div>
           <div>
             <h1 className="brand-name">Massive Mobility</h1>
-            <p className="brand-sub">Charging Simulator · Workspace: Massive Charging</p>
+            <p className="brand-sub">
+              Charging Simulator · Workspace: Massive Charging · build {APP_BUILD}
+            </p>
           </div>
         </div>
         <div className="top-meta">

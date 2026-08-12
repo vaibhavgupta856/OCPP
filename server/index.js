@@ -29,7 +29,12 @@ const registry = new Registry({ io });
 /* ---------- REST API ---------- */
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, service: 'massive-mobility-charging-sim', chargers: registry.chargers.size });
+  res.json({
+    ok: true,
+    service: 'massive-mobility-charging-sim',
+    chargers: registry.chargers.size,
+    commit: (process.env.RENDER_GIT_COMMIT || process.env.GITHUB_SHA || '').slice(0, 7) || null,
+  });
 });
 
 app.get('/api/chargers', (_req, res) => {
