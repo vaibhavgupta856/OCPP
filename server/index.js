@@ -247,10 +247,24 @@ io.on('connection', (socket) => {
 
 if (isProd) {
   const dist = path.join(ROOT, 'client', 'dist');
-  app.use(express.static(dist));
+  // Hashed Vite assets can be cached; HTML must always revalidate so deploys show up
+  app.use(
+    express.static(dist, {
+      setHeaders(res, filePath) {
+        if (filePath.endsWith('.html')) {
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        } else if (/\.[a-f0-9]{8,}\.(js|css|woff2?)$/i.test(filePath)) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        } else {
+          res.setHeader('Cache-Control', 'public, max-age=300');
+        }
+      },
+    })
+  );
   // SPA fallback — API + Socket.IO routes are registered above and take precedence
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api') || req.path.startsWith('/socket.io')) return next();
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.sendFile(path.join(dist, 'index.html'));
   });
 }

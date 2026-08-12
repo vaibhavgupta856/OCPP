@@ -100,49 +100,39 @@ function makeSurfaceMaps({
 function makeNfcPadTexture({ disabled = false } = {}) {
   const c = document.createElement('canvas');
   c.width = 512;
-  c.height = 192;
+  c.height = 160;
   const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, c.width, c.height);
 
-  const g = ctx.createLinearGradient(0, 0, c.width, c.height);
-  g.addColorStop(0, disabled ? '#2a2e34' : '#1c1014');
-  g.addColorStop(0.55, disabled ? '#1a1d22' : '#2a1218');
-  g.addColorStop(1, disabled ? '#12151a' : '#12080c');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, c.width, c.height);
+  const ink = disabled ? 'rgba(190,200,210,0.4)' : 'rgba(255,220,225,0.95)';
+  const inkDim = disabled ? 'rgba(190,200,210,0.28)' : 'rgba(255,170,180,0.72)';
 
-  // subtle top sheen
-  const sheen = ctx.createLinearGradient(0, 0, 0, 70);
-  sheen.addColorStop(0, 'rgba(255,255,255,0.1)');
-  sheen.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = sheen;
-  ctx.fillRect(0, 0, c.width, 70);
-
-  const cx = c.width * 0.22;
+  const cx = 88;
   const cy = c.height * 0.5;
-  const stroke = disabled ? 'rgba(180,190,200,0.28)' : 'rgba(255,170,180,0.7)';
-  ctx.strokeStyle = stroke;
+  ctx.strokeStyle = ink;
   ctx.lineCap = 'round';
   for (let i = 0; i < 3; i += 1) {
-    const r = 18 + i * 16;
-    ctx.lineWidth = 3.5 - i * 0.4;
+    const r = 14 + i * 14;
+    ctx.lineWidth = 3.2 - i * 0.35;
+    ctx.globalAlpha = 1 - i * 0.12;
     ctx.beginPath();
-    ctx.arc(cx, cy, r, -Math.PI * 0.55, Math.PI * 0.55);
+    ctx.arc(cx, cy, r, -Math.PI * 0.58, Math.PI * 0.58);
     ctx.stroke();
   }
-  ctx.fillStyle = disabled ? 'rgba(200,210,220,0.35)' : '#ffb3bb';
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = ink;
   ctx.beginPath();
-  ctx.arc(cx - 2, cy, 5.5, 0, Math.PI * 2);
+  ctx.arc(cx - 4, cy, 5, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  ctx.fillStyle = disabled ? 'rgba(200,210,220,0.4)' : '#ffe4e8';
-  ctx.font = '800 52px system-ui, Segoe UI, Arial, sans-serif';
-  ctx.fillText('TAP', 170, cy - 14);
-  ctx.fillStyle = disabled ? 'rgba(200,210,220,0.28)' : 'rgba(255,179,187,0.78)';
-  ctx.font = '700 28px system-ui, Segoe UI, Arial, sans-serif';
-  ctx.letterSpacing = '0.18em';
-  ctx.fillText('RFID  ·  NFC', 170, cy + 28);
+  ctx.fillStyle = ink;
+  ctx.font = '800 54px system-ui, Segoe UI, Arial, sans-serif';
+  ctx.fillText('TAP', 168, cy - 10);
+  ctx.fillStyle = inkDim;
+  ctx.font = '700 22px system-ui, Segoe UI, Arial, sans-serif';
+  ctx.fillText('RFID  ·  NFC', 170, cy + 26);
 
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -205,63 +195,113 @@ function MushroomStop({ position, disabled, onClick }) {
   );
 }
 
-function RfidPad({ position, disabled, onClick, w = 0.5, h = 0.12 }) {
+/** Compact pill-shaped contactless reader on the charger face */
+function RfidPad({ position, disabled, onClick, w = 0.34, h = 0.085 }) {
   const [hovered, setHovered] = useState(false);
+  const faceMat = useRef();
+  const glowMat = useRef();
   const texture = useMemo(() => makeNfcPadTexture({ disabled: !!disabled }), [disabled]);
+  const r = h / 2;
+  const bodyW = Math.max(w - h, 0.08);
+
+  useFrame(({ clock }) => {
+    if (disabled) {
+      if (faceMat.current) faceMat.current.emissiveIntensity = 0.04;
+      if (glowMat.current) glowMat.current.emissiveIntensity = 0.04;
+      return;
+    }
+    const pulse = 0.5 + 0.5 * Math.sin(clock.elapsedTime * (hovered ? 5.5 : 2.4));
+    if (faceMat.current) {
+      faceMat.current.emissiveIntensity = hovered ? 0.28 + pulse * 0.35 : 0.12 + pulse * 0.14;
+    }
+    if (glowMat.current) {
+      glowMat.current.emissiveIntensity = hovered ? 0.35 + pulse * 0.55 : 0.12 + pulse * 0.22;
+      glowMat.current.opacity = hovered ? 0.4 : 0.22;
+    }
+  });
+
+  const hitHandlers = {
+    onClick: (e) => {
+      e.stopPropagation();
+      if (!disabled) onClick?.(e);
+    },
+    onPointerOver: (e) => {
+      e.stopPropagation();
+      if (!disabled) setHovered(true);
+      document.body.style.cursor = disabled ? 'not-allowed' : 'default';
+    },
+    onPointerOut: () => {
+      setHovered(false);
+      document.body.style.cursor = 'default';
+    },
+  };
+
+  const faceProps = {
+    color: disabled ? '#2a3038' : '#1a0e12',
+    emissive: disabled ? '#111111' : '#c02434',
+    emissiveIntensity: 0.15,
+    metalness: 0.4,
+    roughness: 0.22,
+    clearcoat: 0.9,
+    clearcoatRoughness: 0.08,
+    envMapIntensity: 1.25,
+    transparent: disabled,
+    opacity: disabled ? 0.55 : 1,
+  };
 
   return (
     <group position={position}>
-      {/* Slim bezel */}
-      <mesh position={[0, 0, -0.008]}>
-        <boxGeometry args={[w + 0.045, h + 0.035, 0.028]} />
-        <meshStandardMaterial color="#101418" metalness={0.88} roughness={0.22} envMapIntensity={1.4} />
+      {/* Recessed chrome tray */}
+      <mesh position={[0, 0, -0.01]}>
+        <boxGeometry args={[w + 0.03, h + 0.028, 0.02]} />
+        <meshStandardMaterial color="#0c1016" metalness={0.92} roughness={0.18} envMapIntensity={1.5} />
       </mesh>
-      {/* Soft glow halo */}
-      <mesh position={[0, 0, 0.002]}>
-        <boxGeometry args={[w + 0.02, h + 0.016, 0.01]} />
+      <mesh position={[-(bodyW / 2), 0, -0.01]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[(h + 0.028) / 2, (h + 0.028) / 2, 0.02, 20]} />
+        <meshStandardMaterial color="#0c1016" metalness={0.92} roughness={0.18} envMapIntensity={1.5} />
+      </mesh>
+      <mesh position={[bodyW / 2, 0, -0.01]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[(h + 0.028) / 2, (h + 0.028) / 2, 0.02, 20]} />
+        <meshStandardMaterial color="#0c1016" metalness={0.92} roughness={0.18} envMapIntensity={1.5} />
+      </mesh>
+
+      {/* Soft breath glow */}
+      <mesh position={[0, 0, 0.001]}>
+        <boxGeometry args={[w + 0.012, h + 0.01, 0.006]} />
         <meshStandardMaterial
+          ref={glowMat}
           color="#c02434"
           emissive="#c02434"
-          emissiveIntensity={hovered && !disabled ? 0.55 : disabled ? 0.05 : 0.22}
+          emissiveIntensity={0.2}
           transparent
-          opacity={0.35}
+          opacity={0.22}
           depthWrite={false}
         />
       </mesh>
-      <mesh
-        position={[0, 0, 0.016]}
-        castShadow
-        onClick={(e) => {
-          e.stopPropagation();
-          if (!disabled) onClick?.(e);
-        }}
-        onPointerOver={(e) => {
-          e.stopPropagation();
-          if (!disabled) setHovered(true);
-          document.body.style.cursor = disabled ? 'not-allowed' : 'default';
-        }}
-        onPointerOut={() => {
-          setHovered(false);
-          document.body.style.cursor = 'default';
-        }}
-      >
-        <boxGeometry args={[w, h, 0.024]} />
-        <meshPhysicalMaterial
-          color={disabled ? '#2a2e34' : '#241016'}
-          emissive={hovered && !disabled ? '#c02434' : '#7a1520'}
-          emissiveIntensity={hovered && !disabled ? 0.4 : 0.18}
-          metalness={0.55}
-          roughness={0.18}
-          clearcoat={0.85}
-          clearcoatRoughness={0.1}
-          envMapIntensity={1.35}
-          transparent={disabled}
-          opacity={disabled ? 0.55 : 1}
-        />
+
+      {/* Pill face — center + rounded caps */}
+      <mesh position={[0, 0, 0.012]} castShadow {...hitHandlers}>
+        <boxGeometry args={[bodyW, h, 0.018]} />
+        <meshPhysicalMaterial ref={faceMat} {...faceProps} />
       </mesh>
-      <mesh position={[0, 0, 0.032]} renderOrder={3}>
-        <planeGeometry args={[w * 0.94, h * 0.82]} />
-        <meshBasicMaterial map={texture} transparent alphaTest={0.05} depthWrite={false} toneMapped={false} />
+      <mesh position={[-(bodyW / 2), 0, 0.012]} rotation={[0, 0, Math.PI / 2]} castShadow {...hitHandlers}>
+        <cylinderGeometry args={[r, r, 0.018, 22]} />
+        <meshPhysicalMaterial {...faceProps} emissiveIntensity={hovered && !disabled ? 0.35 : 0.15} />
+      </mesh>
+      <mesh position={[bodyW / 2, 0, 0.012]} rotation={[0, 0, Math.PI / 2]} castShadow {...hitHandlers}>
+        <cylinderGeometry args={[r, r, 0.018, 22]} />
+        <meshPhysicalMaterial {...faceProps} emissiveIntensity={hovered && !disabled ? 0.35 : 0.15} />
+      </mesh>
+
+      {/* Gloss lip */}
+      <mesh position={[0, h * 0.28, 0.022]}>
+        <boxGeometry args={[bodyW * 0.72, h * 0.12, 0.002]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.14} depthWrite={false} />
+      </mesh>
+
+      <mesh position={[0, 0, 0.024]} renderOrder={3}>
+        <planeGeometry args={[w * 0.88, h * 0.7]} />
+        <meshBasicMaterial map={texture} transparent depthWrite={false} toneMapped={false} />
       </mesh>
     </group>
   );
@@ -311,15 +351,15 @@ function EvGunHolster({
   const frontZ = wingD / 2 + 0.05;
   const s = side;
 
-  const dockedPos = useMemo(() => new THREE.Vector3(0, 0.14, frontZ + 0.22), [frontZ]);
-  const outPos = useMemo(() => new THREE.Vector3(s * 0.08, 0.08, frontZ + 0.42), [frontZ, s]);
+  const dockedPos = useMemo(() => new THREE.Vector3(0, 0.14, frontZ + 0.28), [frontZ]);
+  const outPos = useMemo(() => new THREE.Vector3(s * 0.08, 0.08, frontZ + 0.48), [frontZ, s]);
   const dockedEuler = useMemo(() => new THREE.Euler(0.18, 0, 0), []);
   const outEuler = useMemo(() => new THREE.Euler(0.52, s * 0.28, s * 0.1), [s]);
   const tmpPos = useMemo(() => new THREE.Vector3(), []);
   const tmpQuatA = useMemo(() => new THREE.Quaternion(), []);
   const tmpQuatB = useMemo(() => new THREE.Quaternion(), []);
   const tmpQuat = useMemo(() => new THREE.Quaternion(), []);
-  const glandPt = useMemo(() => new THREE.Vector3(0, 0.58, frontZ + 0.16), [frontZ]);
+  const glandPt = useMemo(() => new THREE.Vector3(0, 0.58, frontZ + 0.2), [frontZ]);
   const attachLocal = useMemo(() => new THREE.Vector3(0, 0.02, -0.05), []);
   const attachWorld = useMemo(() => new THREE.Vector3(), []);
   const mid1 = useMemo(() => new THREE.Vector3(), []);
@@ -432,7 +472,7 @@ function EvGunHolster({
 
     // Keep cable in front of the pocket so segments never z-fight the cradle
     const sag = THREE.MathUtils.lerp(0.16, 0.03, t);
-    const cableZMin = frontZ + 0.12;
+    const cableZMin = frontZ + 0.18;
     mid1.lerpVectors(glandPt, attachWorld, 0.3);
     mid1.y -= sag * 0.4;
     mid1.x += s * 0.028 * (1 - t * 0.35);
@@ -562,44 +602,44 @@ function EvGunHolster({
         );
       })()}
 
-      {/* Pocket back wall — deep behind the face opening */}
-      <mesh position={[0, 0.2, frontZ - 0.035]} castShadow>
-        <boxGeometry args={[0.26, 0.54, 0.02]} />
-        <meshStandardMaterial color="#0b0e12" metalness={0.35} roughness={0.75} />
+      {/* Pocket back wall — deep behind the face opening (no shadows = no acne flicker) */}
+      <mesh position={[0, 0.2, frontZ - 0.05]}>
+        <boxGeometry args={[0.26, 0.54, 0.016]} />
+        <meshStandardMaterial color="#0b0e12" metalness={0.2} roughness={0.85} />
       </mesh>
       {/* Pocket side / top / bottom walls (frame only — no nested solid boxes) */}
-      <mesh position={[-0.13, 0.2, frontZ - 0.01]} castShadow>
-        <boxGeometry args={[0.02, 0.54, 0.05]} />
-        <meshStandardMaterial color="#12161c" metalness={0.45} roughness={0.55} />
+      <mesh position={[-0.13, 0.2, frontZ - 0.02]}>
+        <boxGeometry args={[0.02, 0.54, 0.06]} />
+        <meshStandardMaterial color="#12161c" metalness={0.35} roughness={0.65} />
       </mesh>
-      <mesh position={[0.13, 0.2, frontZ - 0.01]} castShadow>
-        <boxGeometry args={[0.02, 0.54, 0.05]} />
-        <meshStandardMaterial color="#12161c" metalness={0.45} roughness={0.55} />
+      <mesh position={[0.13, 0.2, frontZ - 0.02]}>
+        <boxGeometry args={[0.02, 0.54, 0.06]} />
+        <meshStandardMaterial color="#12161c" metalness={0.35} roughness={0.65} />
       </mesh>
-      <mesh position={[0, 0.46, frontZ - 0.01]} castShadow>
-        <boxGeometry args={[0.28, 0.02, 0.05]} />
-        <meshStandardMaterial color="#12161c" metalness={0.45} roughness={0.55} />
+      <mesh position={[0, 0.46, frontZ - 0.02]}>
+        <boxGeometry args={[0.28, 0.02, 0.06]} />
+        <meshStandardMaterial color="#12161c" metalness={0.35} roughness={0.65} />
       </mesh>
-      <mesh position={[0, -0.06, frontZ - 0.01]} castShadow>
-        <boxGeometry args={[0.28, 0.02, 0.05]} />
-        <meshStandardMaterial color="#12161c" metalness={0.45} roughness={0.55} />
+      <mesh position={[0, -0.06, frontZ - 0.02]}>
+        <boxGeometry args={[0.28, 0.02, 0.06]} />
+        <meshStandardMaterial color="#12161c" metalness={0.35} roughness={0.65} />
       </mesh>
       {/* Slim front rim proud of the faceplate */}
-      <mesh position={[0, 0.46, frontZ + 0.02]} castShadow>
-        <boxGeometry args={[0.3, 0.02, 0.016]} />
-        <meshStandardMaterial color="#1a1f26" metalness={0.55} roughness={0.4} />
+      <mesh position={[0, 0.46, frontZ + 0.025]}>
+        <boxGeometry args={[0.3, 0.02, 0.014]} />
+        <meshStandardMaterial color="#1a1f26" metalness={0.45} roughness={0.5} />
       </mesh>
-      <mesh position={[0, -0.06, frontZ + 0.02]} castShadow>
-        <boxGeometry args={[0.3, 0.02, 0.016]} />
-        <meshStandardMaterial color="#1a1f26" metalness={0.55} roughness={0.4} />
+      <mesh position={[0, -0.06, frontZ + 0.025]}>
+        <boxGeometry args={[0.3, 0.02, 0.014]} />
+        <meshStandardMaterial color="#1a1f26" metalness={0.45} roughness={0.5} />
       </mesh>
-      <mesh position={[-0.14, 0.2, frontZ + 0.02]} castShadow>
-        <boxGeometry args={[0.02, 0.54, 0.016]} />
-        <meshStandardMaterial color="#1a1f26" metalness={0.55} roughness={0.4} />
+      <mesh position={[-0.14, 0.2, frontZ + 0.025]}>
+        <boxGeometry args={[0.02, 0.54, 0.014]} />
+        <meshStandardMaterial color="#1a1f26" metalness={0.45} roughness={0.5} />
       </mesh>
-      <mesh position={[0.14, 0.2, frontZ + 0.02]} castShadow>
-        <boxGeometry args={[0.02, 0.54, 0.016]} />
-        <meshStandardMaterial color="#1a1f26" metalness={0.55} roughness={0.4} />
+      <mesh position={[0.14, 0.2, frontZ + 0.025]}>
+        <boxGeometry args={[0.02, 0.54, 0.014]} />
+        <meshStandardMaterial color="#1a1f26" metalness={0.45} roughness={0.5} />
       </mesh>
 
       <mesh position={[0, 0.42, frontZ + 0.055]} castShadow>
@@ -1011,8 +1051,8 @@ export default function MassiveChargerMesh({
       {/* RFID pad only — page/action buttons live on the touch screen (no duplicates) */}
       <RfidPad
         position={[0, 1.78, bodyD / 2 + 0.075]}
-        w={0.5}
-        h={0.12}
+        w={0.34}
+        h={0.085}
         disabled={busy}
         onClick={() => onTapCard?.(active?.number)}
       />

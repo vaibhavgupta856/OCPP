@@ -171,11 +171,12 @@ function SceneContent(props) {
 
       <ContactShadows
         position={[0, 0.02, 0]}
-        opacity={0.4}
+        opacity={0.28}
         scale={12}
-        blur={2.4}
-        far={8}
-        resolution={512}
+        blur={2.8}
+        far={6}
+        resolution={256}
+        frames={1}
         color="#1a1f28"
       />
 
@@ -205,19 +206,21 @@ export default function EvYard3D(props) {
     <div className="ev-yard-3d roomy">
       <Canvas
         shadows
-        dpr={[1, 1.5]}
-        camera={{ position: FRONT_CAM, fov: 44, near: 0.35, far: 60 }}
+        dpr={[1, 1.25]}
+        camera={{ position: FRONT_CAM, fov: 44, near: 0.5, far: 40 }}
         gl={{
           antialias: true,
           alpha: false,
           powerPreference: 'high-performance',
-          logarithmicDepthBuffer: true,
+          // logarithmicDepthBuffer causes panel flicker on some GPUs in production
+          logarithmicDepthBuffer: false,
           toneMapping: THREE.ACESFilmicToneMapping,
           toneMappingExposure: 1.22,
         }}
         onCreated={({ gl, camera }) => {
           gl.setClearColor('#e8ecf2');
           gl.domElement.style.cursor = 'default';
+          gl.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
           camera.lookAt(...FRONT_TARGET);
         }}
       >
