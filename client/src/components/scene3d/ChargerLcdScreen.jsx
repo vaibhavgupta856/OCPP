@@ -120,6 +120,9 @@ export default function ChargerLcdScreen({
     const context = c.getContext('2d');
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
+    tex.generateMipmaps = false;
+    tex.minFilter = THREE.LinearFilter;
+    tex.magFilter = THREE.LinearFilter;
     tex.anisotropy = 1;
     return { texture: tex, ctx: context, canvas: c };
   }, []);
