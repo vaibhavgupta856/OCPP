@@ -259,10 +259,12 @@ if (isProd) {
       setHeaders(res, filePath) {
         if (filePath.endsWith('.html')) {
           res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+          res.setHeader('Pragma', 'no-cache');
+          res.setHeader('Expires', '0');
         } else if (/\.[a-f0-9]{8,}\.(js|css|woff2?)$/i.test(filePath)) {
           res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
         } else {
-          res.setHeader('Cache-Control', 'public, max-age=300');
+          res.setHeader('Cache-Control', 'no-cache');
         }
       },
     })
@@ -271,6 +273,8 @@ if (isProd) {
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api') || req.path.startsWith('/socket.io')) return next();
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.sendFile(path.join(dist, 'index.html'));
   });
 }

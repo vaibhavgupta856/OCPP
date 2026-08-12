@@ -185,7 +185,7 @@ export default function App() {
           </div>
           <div>
             <h1 className="brand-name">Massive Mobility</h1>
-            <p className="brand-sub">Charging Simulator · Workspace: Massive Charging</p>
+            <p className="brand-sub">Charging Simulator · Workspace: Massive Charging · ui-a880e42</p>
           </div>
         </div>
         <div className="top-meta">
