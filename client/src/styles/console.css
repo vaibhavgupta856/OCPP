@@ -1265,15 +1265,22 @@
   font-size: 0.72rem;
   color: var(--ink-muted, #6b7280);
 }
+.car-config-section {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #ffffff;
+  padding-top: 0.15rem;
+}
 .car-config {
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
   margin-top: 0.35rem;
   padding: 0.65rem 0.7rem;
-  border: 1px solid var(--steel, #d7dde5);
+  border: 1px solid #e8b4ba;
   border-radius: 10px;
-  background: #fafbfc;
+  background: #fff8f8;
 }
 .car-config-title {
   margin: 0;
@@ -1294,6 +1301,7 @@
   padding: 0.5rem 0.55rem 0.35rem;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
+  background: #fff;
 }
 .fill-goal legend {
   padding: 0 0.25rem;
@@ -1303,15 +1311,15 @@
 }
 .fill-option {
   display: grid !important;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 18px minmax(0, 1fr) 5.5rem;
   align-items: center;
   gap: 0.4rem;
   margin-bottom: 0.35rem;
   font-size: 0.78rem;
 }
 .fill-option input[type='number'] {
-  width: 5.5rem;
-  justify-self: end;
+  width: 100%;
+  min-width: 0;
 }
 .car-config-set {
   align-self: flex-start;

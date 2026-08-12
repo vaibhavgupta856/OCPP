@@ -203,112 +203,9 @@ export default function ActionBar({
         </button>
       </section>
 
-      <section className="ctrl-section">
-        <h3>Suspend</h3>
-        <div className="btn-row">
-          <button type="button" disabled={busy} onClick={() => onSuspend('EV')}>
-            EV pause
-          </button>
-          <button type="button" disabled={busy} onClick={() => onSuspend('EVSE')}>
-            EVSE pause
-          </button>
-          <button type="button" disabled={busy} onClick={() => onSuspend(null)}>
-            Resume
-          </button>
-        </div>
-      </section>
-
-      <section className="ctrl-section">
-        <h3>Faults</h3>
-        <select value={faultCode} onChange={(e) => setFaultCode(e.target.value)}>
-          {ERROR_CODES.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-        <div className="btn-row">
-          <button type="button" disabled={busy} onClick={() => onFault(faultCode)}>
-            Inject fault
-          </button>
-          <button type="button" disabled={busy} onClick={onClearFault}>
-            Clear
-          </button>
-        </div>
-      </section>
-
-      <section className="ctrl-section">
-        <h3>Hardware</h3>
-        <label>
-          Connector name
-          <div className="inline-apply">
-            <input
-              value={connName}
-              onChange={(e) => setConnName(e.target.value)}
-              maxLength={40}
-              placeholder={`Connector ${connectorId}`}
-            />
-            <button
-              type="button"
-              disabled={busy || !onName}
-              onClick={() => onName?.(connName)}
-            >
-              Apply
-            </button>
-          </div>
-        </label>
-        <label>
-          Connector type
-          <select
-            value={connector?.type || 'Mennekes T2'}
-            onChange={(e) => onType(e.target.value)}
-          >
-            {CONNECTOR_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          This outlet power (kW)
-          <div className="inline-apply">
-            <input
-              type="number"
-              min="1"
-              max="350"
-              step="0.1"
-              value={power}
-              onChange={(e) => setPower(e.target.value)}
-            />
-            <button type="button" disabled={busy} onClick={() => onPower(Number(power))}>
-              Apply
-            </button>
-          </div>
-        </label>
-        <label>
-          Energy tariff ({sym}/kWh)
-          <div className="inline-apply">
-            <input
-              type="number"
-              min="0"
-              max="9999"
-              step="0.01"
-              value={rate}
-              onChange={(e) => setRate(e.target.value)}
-            />
-            <button
-              type="button"
-              disabled={busy || !onTariff}
-              onClick={() => onTariff?.({ energyRatePerKwh: Number(rate) })}
-            >
-              Apply
-            </button>
-          </div>
-        </label>
+      <section className="ctrl-section car-config-section">
+        <h3>Car configuration</h3>
         <div className="car-config">
-          <p className="car-config-title">Car configuration</p>
-
           <label>
             1. Energy already in car (kWh)
             <input
@@ -418,7 +315,7 @@ export default function ActionBar({
             className="car-config-set"
             disabled={busy}
             onClick={() =>
-              onSoc({
+              onSoc?.({
                 energyKwh: inKwh,
                 batteryKwh: packKwh,
                 fillMode,
@@ -431,6 +328,111 @@ export default function ActionBar({
             Set car config
           </button>
         </div>
+      </section>
+
+      <section className="ctrl-section">
+        <h3>Suspend</h3>
+        <div className="btn-row">
+          <button type="button" disabled={busy} onClick={() => onSuspend('EV')}>
+            EV pause
+          </button>
+          <button type="button" disabled={busy} onClick={() => onSuspend('EVSE')}>
+            EVSE pause
+          </button>
+          <button type="button" disabled={busy} onClick={() => onSuspend(null)}>
+            Resume
+          </button>
+        </div>
+      </section>
+
+      <section className="ctrl-section">
+        <h3>Faults</h3>
+        <select value={faultCode} onChange={(e) => setFaultCode(e.target.value)}>
+          {ERROR_CODES.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+        <div className="btn-row">
+          <button type="button" disabled={busy} onClick={() => onFault(faultCode)}>
+            Inject fault
+          </button>
+          <button type="button" disabled={busy} onClick={onClearFault}>
+            Clear
+          </button>
+        </div>
+      </section>
+
+      <section className="ctrl-section">
+        <h3>Hardware</h3>
+        <label>
+          Connector name
+          <div className="inline-apply">
+            <input
+              value={connName}
+              onChange={(e) => setConnName(e.target.value)}
+              maxLength={40}
+              placeholder={`Connector ${connectorId}`}
+            />
+            <button
+              type="button"
+              disabled={busy || !onName}
+              onClick={() => onName?.(connName)}
+            >
+              Apply
+            </button>
+          </div>
+        </label>
+        <label>
+          Connector type
+          <select
+            value={connector?.type || 'Mennekes T2'}
+            onChange={(e) => onType(e.target.value)}
+          >
+            {CONNECTOR_TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          This outlet power (kW)
+          <div className="inline-apply">
+            <input
+              type="number"
+              min="1"
+              max="350"
+              step="0.1"
+              value={power}
+              onChange={(e) => setPower(e.target.value)}
+            />
+            <button type="button" disabled={busy} onClick={() => onPower(Number(power))}>
+              Apply
+            </button>
+          </div>
+        </label>
+        <label>
+          Energy tariff ({sym}/kWh)
+          <div className="inline-apply">
+            <input
+              type="number"
+              min="0"
+              max="9999"
+              step="0.01"
+              value={rate}
+              onChange={(e) => setRate(e.target.value)}
+            />
+            <button
+              type="button"
+              disabled={busy || !onTariff}
+              onClick={() => onTariff?.({ energyRatePerKwh: Number(rate) })}
+            >
+              Apply
+            </button>
+          </div>
+        </label>
       </section>
 
       <section className="ctrl-section">
