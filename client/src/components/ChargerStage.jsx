@@ -138,19 +138,19 @@ export default function ChargerStage({
         />
       </Suspense>
 
-      <details className="cp-2d-panel cp-2d-collapsible">
-        <summary className="cp-2d-summary">
-          Operator panel · {targetLabel} · {active.status}
-          {active.transactionId ? ` · Tx #${active.transactionId}` : ''}
-        </summary>
-
+      <section className="cp-2d-panel" aria-label="Charge point controls">
         <header className="cp-2d-head">
           <div>
-            <h3>Controls</h3>
+            <h3>Operator panel</h3>
             <p>
               Acting on <strong>{targetLabel}</strong>
+              {active.transactionId ? ` · Tx #${active.transactionId}` : ''}
+              {` · ${active.status}`}
               {` · ${((active.meterWh || 0) / 1000).toFixed(2)} kWh`}
               {` · ${charger.currencySymbol || '₹'}${Number(active.sessionCost ?? 0).toFixed(2)}`}
+              {active.lastSessionCost != null && !active.transactionId
+                ? ` · last ${charger.currencySymbol || '₹'}${Number(active.lastSessionCost).toFixed(2)}`
+                : ''}
             </p>
           </div>
           <label className="stage-tag inline">
@@ -282,7 +282,7 @@ export default function ChargerStage({
             ))}
           </div>
         </div>
-      </details>
+      </section>
     </div>
   );
 }
