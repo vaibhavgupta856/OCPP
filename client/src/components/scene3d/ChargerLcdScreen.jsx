@@ -141,9 +141,12 @@ export default function ChargerLcdScreen({
     ctx.fillStyle = '#1a1012';
     ctx.fillRect(0, 0, W, H);
 
-    ctx.strokeStyle = '#5a2030';
-    ctx.lineWidth = 6;
-    ctx.strokeRect(12, 12, W - 24, H - 24);
+    const withButtons = showButtonsRef.current;
+    if (withButtons) {
+      ctx.strokeStyle = '#5a2030';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(12, 12, W - 24, H - 24);
+    }
 
     // top status bar
     ctx.fillStyle = '#2a1218';
@@ -162,7 +165,6 @@ export default function ChargerLcdScreen({
     ctx.textAlign = 'right';
     ctx.fillText(online ? 'ONLINE' : String(connectionState || 'OFFLINE').toUpperCase(), W - 56, 84);
 
-    const withButtons = showButtonsRef.current;
     const contentTop = 168;
     const contentBottom = withButtons ? H - 280 : H - 56;
 

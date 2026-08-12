@@ -1072,30 +1072,8 @@ export default function MassiveChargerMesh({
         onSelectOutlet={onSelectOutlet}
       />
 
-      {/* Larger display-only HMI clone — to the right, never covers the pedestal */}
+      {/* Larger display-only HMI clone — to the right, no frame/border */}
       <group visible={lcdPeek} position={[bodyW / 2 + 1.55, 2.4, bodyD / 2 - 0.05]}>
-        <mesh position={[0, 0, -0.04]} castShadow>
-          <boxGeometry args={[2.05, 1.62, 0.06]} />
-          <meshPhysicalMaterial
-            color="#0c0f14"
-            metalness={1}
-            roughness={0.1}
-            clearcoat={0.85}
-            envMapIntensity={1.6}
-          />
-        </mesh>
-        <mesh position={[0, 0.82, 0.01]}>
-          <planeGeometry args={[1.8, 0.14]} />
-          <meshBasicMaterial color="#1a1014" toneMapped={false} />
-        </mesh>
-        <CanvasLabel
-          text="HMI PREVIEW"
-          position={[0, 0.82, 0.02]}
-          width={0.85}
-          height={0.1}
-          fontSize={42}
-          color="#ffb3bb"
-        />
         <ChargerLcdScreen
           connector={active}
           connectors={connectors}
@@ -1105,7 +1083,7 @@ export default function MassiveChargerMesh({
           firmwareStatus={firmwareStatus}
           hardware={hardware}
           tariff={tariff}
-          position={[0, -0.05, 0.02]}
+          position={[0, 0, 0.02]}
           size={[1.88, 1.42]}
           page={page}
           busy={busy}
