@@ -16,8 +16,8 @@
   border-bottom: 1px solid var(--steel);
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(12px);
-  position: sticky;
-  top: 0;
+  position: relative;
+  flex-shrink: 0;
   z-index: 20;
 }
 
@@ -1542,6 +1542,11 @@
   border-top: 1px solid var(--steel);
   background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(8px);
+  flex-shrink: 0;
+  max-height: 28vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 .trace-head {
   display: flex;
