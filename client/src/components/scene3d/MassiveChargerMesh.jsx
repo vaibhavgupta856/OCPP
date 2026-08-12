@@ -889,7 +889,7 @@ export default function MassiveChargerMesh({
       )}
 
       {/* Recessed screen bezel — larger HMI */}
-      <mesh position={[0, 2.42, bodyD / 2 + 0.01]} castShadow>
+      <mesh position={[0, 2.42, bodyD / 2 + 0.055]} castShadow>
         <boxGeometry args={[1.02, 0.88, 0.06]} />
         <meshPhysicalMaterial
           color="#0c0f14"
@@ -899,7 +899,7 @@ export default function MassiveChargerMesh({
           envMapIntensity={2}
         />
       </mesh>
-      <mesh position={[0, 2.42, bodyD / 2 + 0.035]}>
+      <mesh position={[0, 2.42, bodyD / 2 + 0.085]}>
         <boxGeometry args={[0.96, 0.82, 0.02]} />
         <meshPhysicalMaterial
           color="#1a1014"
@@ -920,7 +920,7 @@ export default function MassiveChargerMesh({
         identity={identity}
         firmwareStatus={firmwareStatus}
         tariff={tariff}
-        position={[0, 2.42, bodyD / 2 + 0.055]}
+        position={[0, 2.42, bodyD / 2 + 0.105]}
         size={[0.92, 0.78]}
         page={page}
         busy={busy}
@@ -934,7 +934,7 @@ export default function MassiveChargerMesh({
 
       {/* RFID pad only — page/action buttons live on the touch screen (no duplicates) */}
       <RfidPad
-        position={[0, 1.78, bodyD / 2 + 0.04]}
+        position={[0, 1.78, bodyD / 2 + 0.075]}
         w={0.92}
         h={0.22}
         disabled={busy}
@@ -942,7 +942,7 @@ export default function MassiveChargerMesh({
       />
 
       {/* Brand kick plate */}
-      <mesh position={[0, 0.55, bodyD / 2 + 0.01]} castShadow>
+      <mesh position={[0, 0.55, bodyD / 2 + 0.055]} castShadow>
         <boxGeometry args={[bodyW - 0.2, 0.28, 0.04]} />
         <meshPhysicalMaterial
           map={surfaces.accentMap.map}
@@ -955,7 +955,7 @@ export default function MassiveChargerMesh({
       </mesh>
       <CanvasLabel
         text="EV CHARGER"
-        position={[0, 0.55, bodyD / 2 + 0.04]}
+        position={[0, 0.55, bodyD / 2 + 0.085]}
         width={0.55}
         height={0.08}
         fontSize={40}
@@ -963,7 +963,7 @@ export default function MassiveChargerMesh({
       />
       <CanvasLabel
         text={`C${active?.number || 1} · ${active?.status || ''}`}
-        position={[0, 0.35, bodyD / 2 + 0.04]}
+        position={[0, 0.35, bodyD / 2 + 0.085]}
         width={0.7}
         height={0.06}
         fontSize={28}
@@ -971,7 +971,7 @@ export default function MassiveChargerMesh({
       />
 
       <MushroomStop
-        position={[bodyW / 2 - 0.18, 0.95, bodyD / 2 + 0.04]}
+        position={[bodyW / 2 - 0.18, 0.95, bodyD / 2 + 0.08]}
         disabled={busy || !isTx}
         onClick={() => onEmergency?.(active?.number)}
       />
