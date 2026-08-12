@@ -47,6 +47,7 @@ After deploy, open `https://<service>.onrender.com`. Free instances sleep when i
 
 ## Docs
 
+- `docs/User-Guide.md` — **start here** — how new users run sessions and use each UI panel
 - `docs/OCPP-1.6-Guide.md` — short OCPP 1.6 overview
 - `docs/Massive-Mobility-Simulator-Guide.md` / `.docx` — how the simulator works and how parts connect
 - `docs/Tech-Stack-Flow-Guide.md` / `.docx` — every technology in flow order and how they depend on each other
