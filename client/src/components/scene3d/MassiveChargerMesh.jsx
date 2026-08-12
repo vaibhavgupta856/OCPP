@@ -266,14 +266,13 @@ function EvGunHolster({
   onPlug,
 }) {
   const gunRef = useRef();
-  const cableMeshRef = useRef();
   const motion = useRef(plugged || charging ? 1 : 0);
-  const cableMatRef = useRef();
   const gripMatRef = useRef();
   const shellMatRef = useRef();
   const headMatRef = useRef();
   const ledMatRef = useRef();
   const blinkPhase = useRef(0);
+  const cableTint = useMemo(() => new THREE.Color('#1e242c'), []);
 
   const grip = focused ? '#f4f6f8' : selected ? '#cfd6de' : '#2a3038';
   const shell = plugged && !charging ? '#c02434' : '#b8c0c8';
@@ -311,6 +310,12 @@ function EvGunHolster({
     []
   );
   const cableCurve = useMemo(() => new THREE.CatmullRomCurve3(cablePts), [cablePts]);
+  const sampleA = useMemo(() => new THREE.Vector3(), []);
+  const sampleB = useMemo(() => new THREE.Vector3(), []);
+  const segDir = useMemo(() => new THREE.Vector3(), []);
+  const segY = useMemo(() => new THREE.Vector3(0, 1, 0), []);
+  const cableSegRefs = useRef([]);
+  const CABLE_SEGS = 18;
   const cableColor = useMemo(() => new THREE.Color('#1e242c'), []);
   const cableColorOut = useMemo(() => new THREE.Color('#8b1e2a'), []);
   const greenHi = useMemo(() => new THREE.Color('#39ff88'), []);
@@ -321,30 +326,15 @@ function EvGunHolster({
   const silverCol = useMemo(() => new THREE.Color(silver || '#c8d0d8'), [silver]);
   const blinkTmp = useMemo(() => new THREE.Color(), []);
 
-  // Continuous cable tube — rebuilt each frame along gland → gun
-  const initialCurve = useMemo(() => {
-    const end = dockedPos.clone().add(new THREE.Vector3(0, 0.02, -0.05));
-    return new THREE.CatmullRomCurve3([
-      glandPt.clone(),
-      new THREE.Vector3(s * 0.02, 0.35, frontZ + 0.14),
-      new THREE.Vector3(s * 0.03, 0.05, frontZ + 0.16),
-      end,
-    ]);
-  }, [dockedPos, frontZ, glandPt, s]);
-
-  const cableGeo = useMemo(
-    () => new THREE.TubeGeometry(initialCurve, 24, 0.027, 8, false),
-    [initialCurve]
-  );
-
-  const lastCableT = useRef(-1);
-
-  useEffect(() => () => {
-    cableGeo.dispose();
-    if (cableMeshRef.current?.geometry && cableMeshRef.current.geometry !== cableGeo) {
-      cableMeshRef.current.geometry.dispose();
-    }
-  }, [cableGeo]);
+  // Seed docked cable path once so segments have a valid curve on first frame
+  useEffect(() => {
+    const end = dockedPos.clone().add(attachLocal);
+    cablePts[0].copy(glandPt);
+    cablePts[1].set(s * 0.02, 0.35, frontZ + 0.14);
+    cablePts[2].set(s * 0.03, 0.05, frontZ + 0.16);
+    cablePts[3].lerpVectors(glandPt, end, 0.75);
+    cablePts[4].copy(end);
+  }, [attachLocal, cablePts, dockedPos, frontZ, glandPt, s]);
 
   useFrame((_, delta) => {
     const target = charging ? 1 : plugged ? 0.72 : 0;
@@ -369,33 +359,27 @@ function EvGunHolster({
       attachWorld.copy(dockedPos).add(attachLocal);
     }
 
-    if (cableMatRef.current?.color) {
-      cableMatRef.current.color.copy(cableColor).lerp(cableColorOut, t);
-    }
-
-    // Green blink on connector while charging
+    // Soft green pulse on gun/LED only (avoid blasting nearby panel reflections)
     blinkPhase.current += dt;
     if (charging) {
-      const pulse = 0.5 + 0.5 * Math.sin(blinkPhase.current * 5.5); // ~0.9 Hz soft blink
+      const pulse = 0.5 + 0.5 * Math.sin(blinkPhase.current * 5.5);
       blinkTmp.copy(greenLo).lerp(greenHi, pulse);
       if (shellMatRef.current) {
-        shellMatRef.current.color.copy(blinkTmp);
         shellMatRef.current.emissive.copy(greenMid);
-        shellMatRef.current.emissiveIntensity = 0.25 + pulse * 0.85;
+        shellMatRef.current.emissiveIntensity = 0.12 + pulse * 0.35;
       }
       if (headMatRef.current) {
-        headMatRef.current.color.copy(blinkTmp);
         headMatRef.current.emissive.copy(greenHi);
-        headMatRef.current.emissiveIntensity = 0.15 + pulse * 0.7;
+        headMatRef.current.emissiveIntensity = 0.08 + pulse * 0.28;
       }
       if (gripMatRef.current) {
         gripMatRef.current.emissive.copy(greenMid);
-        gripMatRef.current.emissiveIntensity = 0.1 + pulse * 0.45;
+        gripMatRef.current.emissiveIntensity = 0.05 + pulse * 0.18;
       }
       if (ledMatRef.current) {
-        ledMatRef.current.color.copy(greenHi);
+        ledMatRef.current.color.copy(blinkTmp);
         ledMatRef.current.emissive.copy(greenHi);
-        ledMatRef.current.emissiveIntensity = 0.4 + pulse * 1.2;
+        ledMatRef.current.emissiveIntensity = 0.55 + pulse * 0.9;
       }
     } else {
       if (shellMatRef.current) {
@@ -420,14 +404,7 @@ function EvGunHolster({
       }
     }
 
-    // Keep cable locked to gun while moving; skip rebuild at rest to avoid GC hitch
-    const settled = Math.abs(target - motion.current) < 0.0005;
-    if (settled && lastCableT.current >= 0 && Math.abs(t - lastCableT.current) < 0.001) {
-      return;
-    }
-    lastCableT.current = t;
-
-    // Keep cable locked to gun every frame (stepped rebuild caused visible kink)
+    // Update shared curve control points (no geometry allocation)
     const sag = THREE.MathUtils.lerp(0.16, 0.03, t);
     mid1.lerpVectors(glandPt, attachWorld, 0.3);
     mid1.y -= sag * 0.4;
@@ -450,10 +427,25 @@ function EvGunHolster({
     cablePts[3].copy(mid3);
     cablePts[4].copy(attachWorld);
 
-    if (cableMeshRef.current) {
-      const prev = cableMeshRef.current.geometry;
-      cableMeshRef.current.geometry = new THREE.TubeGeometry(cableCurve, 24, 0.027, 8, false);
-      if (prev && prev !== cableGeo) prev.dispose();
+    const tint = cableTint.copy(cableColor).lerp(cableColorOut, t);
+
+    // Pose fixed cylinder segments along the curve — stable meshes, no TubeGeometry thrash
+    for (let i = 0; i < CABLE_SEGS; i += 1) {
+      const mesh = cableSegRefs.current[i];
+      if (!mesh) continue;
+      const u0 = i / CABLE_SEGS;
+      const u1 = (i + 1) / CABLE_SEGS;
+      cableCurve.getPointAt(u0, sampleA);
+      cableCurve.getPointAt(u1, sampleB);
+      segDir.subVectors(sampleB, sampleA);
+      const len = segDir.length();
+      if (len < 1e-5) continue;
+      tmpPos.lerpVectors(sampleA, sampleB, 0.5);
+      mesh.position.copy(tmpPos);
+      mesh.scale.set(1, len, 1);
+      segDir.multiplyScalar(1 / len);
+      mesh.quaternion.setFromUnitVectors(segY, segDir);
+      if (mesh.material?.color) mesh.material.color.copy(tint);
     }
   });
 
@@ -493,8 +485,8 @@ function EvGunHolster({
           clearcoat={0.7}
           envMapIntensity={1.6}
           polygonOffset
-          polygonOffsetFactor={1}
-          polygonOffsetUnits={1}
+          polygonOffsetFactor={2}
+          polygonOffsetUnits={2}
         />
       </mesh>
 
@@ -513,8 +505,8 @@ function EvGunHolster({
         <meshStandardMaterial color={deep} metalness={0.88} roughness={0.28} />
       </mesh>
 
-      <mesh position={[0, 0.05, frontZ]} castShadow>
-        <boxGeometry args={[wingW - 0.05, 1.38, 0.04]} />
+      <mesh position={[0, 0.05, frontZ + 0.01]} castShadow>
+        <boxGeometry args={[wingW - 0.06, 1.36, 0.028]} />
         <meshPhysicalMaterial
           color="#eef1f5"
           metalness={0.18}
@@ -522,6 +514,9 @@ function EvGunHolster({
           clearcoat={1}
           clearcoatRoughness={0.05}
           envMapIntensity={1.55}
+          polygonOffset
+          polygonOffsetFactor={-1}
+          polygonOffsetUnits={-1}
         />
       </mesh>
 
@@ -631,15 +626,21 @@ function EvGunHolster({
         </mesh>
       </group>
 
-      {/* One continuous cable from gland into the gun boot */}
-      <mesh ref={cableMeshRef} geometry={cableGeo} castShadow>
-        <meshStandardMaterial
-          ref={cableMatRef}
-          color="#1e242c"
-          metalness={0.2}
-          roughness={0.72}
-        />
-      </mesh>
+      {/* Stable cable segments (no per-frame TubeGeometry — that flickered the wing panels) */}
+      <group>
+        {Array.from({ length: CABLE_SEGS }, (_, i) => (
+          <mesh
+            key={`cable-seg-${i}`}
+            ref={(el) => {
+              cableSegRefs.current[i] = el;
+            }}
+            castShadow
+          >
+            <cylinderGeometry args={[0.027, 0.027, 1, 8]} />
+            <meshStandardMaterial color="#1e242c" metalness={0.2} roughness={0.72} />
+          </mesh>
+        ))}
+      </group>
 
       {/* Dock cable clip (holds slack when gun is seated) */}
       <mesh position={[0, -0.35, frontZ + 0.06]} castShadow>
