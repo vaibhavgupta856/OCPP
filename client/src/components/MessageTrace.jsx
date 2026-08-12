@@ -37,9 +37,11 @@ export default function MessageTrace({
   connectors = [],
   activeConnector = 1,
   onClear,
+  open = true,
+  onOpenChange,
+  bodyHeight = 72,
 }) {
   const [tab, setTab] = useState('ocpp');
-  const [open, setOpen] = useState(true);
   const [scope, setScope] = useState('all'); // all | station | number
 
   const gunIds = useMemo(() => {
@@ -73,7 +75,6 @@ export default function MessageTrace({
       if (!map.has(label)) map.set(label, []);
       map.get(label).push(m);
     }
-    // stable order: Station first, then C1..Cn
     return [...map.entries()].sort(([a], [b]) => {
       if (a.startsWith('Station')) return -1;
       if (b.startsWith('Station')) return 1;
@@ -119,9 +120,9 @@ export default function MessageTrace({
   );
 
   return (
-    <footer className={`trace-drawer ${open ? 'open' : ''}`}>
+    <div className={`trace-drawer ${open ? 'open' : 'collapsed'}`}>
       <div className="trace-head">
-        <button type="button" className="ghost-btn" onClick={() => setOpen((v) => !v)}>
+        <button type="button" className="ghost-btn" onClick={() => onOpenChange?.(!open)}>
           {open ? '▾' : '▴'} Message Trace
         </button>
         <div className="trace-tabs">
@@ -176,7 +177,7 @@ export default function MessageTrace({
             ))}
           </div>
 
-          <div className="trace-body">
+          <div className="trace-body" style={{ maxHeight: bodyHeight, height: bodyHeight }}>
             {tab === 'ocpp' ? (
               visibleMessages.length === 0 ? (
                 <ul className="trace-list">
@@ -188,15 +189,11 @@ export default function MessageTrace({
                     <h4 className="trace-group-title">
                       {label} <span>({items.length})</span>
                     </h4>
-                    <ul className="trace-list">
-                      {[...items].reverse().map(renderOcppItem)}
-                    </ul>
+                    <ul className="trace-list">{[...items].reverse().map(renderOcppItem)}</ul>
                   </div>
                 ))
               ) : (
-                <ul className="trace-list">
-                  {[...visibleMessages].reverse().map(renderOcppItem)}
-                </ul>
+                <ul className="trace-list">{[...visibleMessages].reverse().map(renderOcppItem)}</ul>
               )
             ) : visibleLogs.length === 0 ? (
               <ul className="trace-list">
@@ -208,9 +205,7 @@ export default function MessageTrace({
                   <h4 className="trace-group-title">
                     {label} <span>({items.length})</span>
                   </h4>
-                  <ul className="trace-list">
-                    {[...items].reverse().map(renderLogItem)}
-                  </ul>
+                  <ul className="trace-list">{[...items].reverse().map(renderLogItem)}</ul>
                 </div>
               ))
             ) : (
@@ -219,6 +214,6 @@ export default function MessageTrace({
           </div>
         </>
       )}
-    </footer>
+    </div>
   );
 }

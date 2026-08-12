@@ -123,6 +123,9 @@
   min-height: 0;
   overflow: hidden;
 }
+.console-body.with-panels {
+  /* columns set inline from layout */
+}
 .console-body.yard-wide {
   grid-template-columns: 240px minmax(0, 1fr);
 }
@@ -132,7 +135,8 @@
 
 .console-body > .rail,
 .console-body > .stage-wrap,
-.console-body > .controls-rail {
+.console-body > .controls-rail,
+.console-body > .panel-chrome {
   min-width: 0;
   min-height: 0;
 }
@@ -473,6 +477,29 @@
   max-height: none;
   height: auto;
   box-shadow: inset -1px 0 0 transparent;
+}
+
+.panel-chrome.rail,
+.panel-chrome.controls-rail {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #ffffff;
+}
+
+.panel-chrome .panel-chrome-body {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+.panel-chrome.controls-rail {
+  border-right: none;
+  border-left: 1px solid var(--steel);
 }
 
 .controls-rail {
@@ -1543,10 +1570,11 @@
   background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(8px);
   flex-shrink: 0;
-  max-height: 28vh;
+  max-height: none;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  height: 100%;
 }
 .trace-head {
   display: flex;
@@ -1704,6 +1732,103 @@
   border: none;
   color: inherit;
   text-decoration: underline;
+}
+
+/* Draggable / resizable panel chrome */
+.panel-chrome {
+  position: relative;
+  box-sizing: border-box;
+}
+.panel-chrome.is-docked.trace-dock {
+  width: 100%;
+  flex-shrink: 0;
+  border-top: 1px solid var(--steel);
+  background: #fff;
+}
+.panel-chrome.is-floating {
+  box-shadow: 0 16px 48px rgba(15, 23, 42, 0.2);
+  border: 1px solid var(--steel);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+.panel-chrome.rail-float {
+  max-height: 72vh;
+}
+.panel-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0.4rem;
+  min-height: 26px;
+  border-bottom: 1px solid var(--steel);
+  background: #f8fafc;
+  flex-shrink: 0;
+}
+.panel-drag-handle {
+  appearance: none;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.65rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 6px;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+.panel-drag-handle:hover {
+  background: var(--brand-soft);
+  color: var(--brand-deep);
+  border-color: var(--brand-muted);
+}
+.panel-drag-handle:active {
+  cursor: grabbing;
+}
+.panel-dock-btn {
+  margin-left: auto;
+  font-size: 0.65rem;
+  padding: 0.15rem 0.5rem;
+}
+.panel-resize-handle {
+  position: absolute;
+  z-index: 6;
+  touch-action: none;
+}
+.panel-resize-handle.edge-right {
+  top: 0;
+  right: 0;
+  width: 7px;
+  height: 100%;
+  cursor: ew-resize;
+}
+.panel-resize-handle.edge-left {
+  top: 0;
+  left: 0;
+  width: 7px;
+  height: 100%;
+  cursor: ew-resize;
+}
+.panel-resize-handle.edge-top {
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 7px;
+  cursor: ns-resize;
+}
+.panel-resize-handle:hover {
+  background: rgba(15, 118, 110, 0.12);
+}
+.trace-dock .panel-chrome-body {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.trace-drawer .trace-body {
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 @media (max-width: 1100px) {
