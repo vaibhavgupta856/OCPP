@@ -6,6 +6,7 @@ import ActionBar from './components/ActionBar.jsx';
 import MessageTrace from './components/MessageTrace.jsx';
 import PanelChrome from './components/PanelChrome.jsx';
 import { usePanelLayout } from './hooks/usePanelLayout.js';
+import { PREVIEW_CHARGER } from './previewCharger.js';
 import './styles/console.css';
 
 const api = async (path, options = {}) => {
@@ -48,6 +49,10 @@ export default function App() {
     () => chargers.find((c) => c.cpId === selectedId) || null,
     [chargers, selectedId]
   );
+
+  const cmsOnline = selected?.connectionState === 'online';
+  const stageCharger = selected || PREVIEW_CHARGER;
+  const controlsEnabled = !!cmsOnline;
 
   const gridColumns = useMemo(() => {
     const parts = [];
@@ -225,31 +230,26 @@ export default function App() {
         )}
 
         <main className="stage-wrap roomy">
-          {selected ? (
-            <ChargerStage
-              charger={selected}
-              activeConnector={activeConnector}
-              selectedConnectors={selectedConnectors}
-              onSelectConnector={selectConnector}
-              onToggleSelectConnector={toggleSelectConnector}
-              busy={busy}
-              idTag={idTag}
-              onIdTagChange={setIdTag}
-              onPlug={(connectorId, plugged) => act('/plug', { connectorId, plugged })}
-              onStart={(connectorId, tag) => act('/start', { connectorId, idTag: tag })}
-              onStop={(connectorId, reason) => act('/stop', { connectorId, reason })}
-              onEmergency={(connectorId) => act('/emergency-stop', { connectorId })}
-              onClearFault={(connectorId) => act('/clear-fault', { connectorId })}
-              onPower={(connectorId, powerKw) => act('/power', { connectorId, powerKw })}
-              onAuthMode={(authMode) => act('/auth-mode', { authMode })}
-              onAddTag={(tag) => act('/local-tag', { idTag: tag })}
-            />
-          ) : (
-            <div className="empty-stage">
-              <h2>No charger on the bench</h2>
-              <p>Commission a charge point from the left rail to open the yard.</p>
-            </div>
-          )}
+          <ChargerStage
+            charger={stageCharger}
+            preview={!selected}
+            controlsEnabled={controlsEnabled}
+            activeConnector={activeConnector}
+            selectedConnectors={selectedConnectors}
+            onSelectConnector={selectConnector}
+            onToggleSelectConnector={toggleSelectConnector}
+            busy={busy || !controlsEnabled}
+            idTag={idTag}
+            onIdTagChange={setIdTag}
+            onPlug={(connectorId, plugged) => act('/plug', { connectorId, plugged })}
+            onStart={(connectorId, tag) => act('/start', { connectorId, idTag: tag })}
+            onStop={(connectorId, reason) => act('/stop', { connectorId, reason })}
+            onEmergency={(connectorId) => act('/emergency-stop', { connectorId })}
+            onClearFault={(connectorId) => act('/clear-fault', { connectorId })}
+            onPower={(connectorId, powerKw) => act('/power', { connectorId, powerKw })}
+            onAuthMode={(authMode) => act('/auth-mode', { authMode })}
+            onAddTag={(tag) => act('/local-tag', { idTag: tag })}
+          />
         </main>
 
         {benchOpen && !rightFloating && (
@@ -263,40 +263,63 @@ export default function App() {
             onMove={(dx, dy) => moveFloat('right', dx, dy)}
             onDock={() => dock('right')}
           >
-            <ActionBar
-              charger={selected}
-              connectorId={activeConnector}
-              selectedConnectors={selectedConnectors}
-              busy={busy}
-              idTag={idTag}
-              onIdTagChange={setIdTag}
-              onPlug={(plugged) => act('/plug', { connectorId: activeConnector, plugged })}
-              onStart={(tag) => act('/start', { connectorId: activeConnector, idTag: tag })}
-              onStop={(reason) => act('/stop', { connectorId: activeConnector, reason })}
-              onEmergency={() => act('/emergency-stop', { connectorId: activeConnector })}
-              onFault={(errorCode) => act('/fault', { connectorId: activeConnector, errorCode })}
-              onClearFault={() => act('/clear-fault', { connectorId: activeConnector })}
-              onSuspend={(who) => act('/suspend', { connectorId: activeConnector, who })}
-              onType={(type) => act('/connector-type', { connectorId: activeConnector, type })}
-              onName={(name) => act('/connector-name', { connectorId: activeConnector, name })}
-              onPower={(powerKw) => act('/power', { connectorId: activeConnector, powerKw })}
-              onSoc={(cfg) =>
-                act('/soc', {
-                  connectorId: activeConnector,
-                  energyKwh: cfg.energyKwh,
-                  batteryKwh: cfg.batteryKwh,
-                  fillMode: cfg.fillMode,
-                  fillEnergyKwh: cfg.fillEnergyKwh,
-                  fillMoney: cfg.fillMoney,
-                  fillMinutes: cfg.fillMinutes,
-                })
-              }
-              onReconnect={(requireSubprotocol) => act('/reconnect', { requireSubprotocol })}
-              onReset={(type) => act('/reset', { type })}
-              onAddTag={(tag) => act('/local-tag', { idTag: tag })}
-              onAuthMode={(authMode) => act('/auth-mode', { authMode })}
-              onTariff={(tariff) => act('/tariff', tariff)}
-            />
+            {controlsEnabled ? (
+              <ActionBar
+                charger={selected}
+                connectorId={activeConnector}
+                selectedConnectors={selectedConnectors}
+                busy={busy}
+                idTag={idTag}
+                onIdTagChange={setIdTag}
+                onPlug={(plugged) => act('/plug', { connectorId: activeConnector, plugged })}
+                onStart={(tag) => act('/start', { connectorId: activeConnector, idTag: tag })}
+                onStop={(reason) => act('/stop', { connectorId: activeConnector, reason })}
+                onEmergency={() => act('/emergency-stop', { connectorId: activeConnector })}
+                onFault={(errorCode) => act('/fault', { connectorId: activeConnector, errorCode })}
+                onClearFault={() => act('/clear-fault', { connectorId: activeConnector })}
+                onSuspend={(who) => act('/suspend', { connectorId: activeConnector, who })}
+                onType={(type) => act('/connector-type', { connectorId: activeConnector, type })}
+                onName={(name) => act('/connector-name', { connectorId: activeConnector, name })}
+                onPower={(powerKw) => act('/power', { connectorId: activeConnector, powerKw })}
+                onSoc={(cfg) =>
+                  act('/soc', {
+                    connectorId: activeConnector,
+                    energyKwh: cfg.energyKwh,
+                    batteryKwh: cfg.batteryKwh,
+                    fillMode: cfg.fillMode,
+                    fillEnergyKwh: cfg.fillEnergyKwh,
+                    fillMoney: cfg.fillMoney,
+                    fillMinutes: cfg.fillMinutes,
+                  })
+                }
+                onReconnect={(requireSubprotocol) => act('/reconnect', { requireSubprotocol })}
+                onReset={(type) => act('/reset', { type })}
+                onAddTag={(tag) => act('/local-tag', { idTag: tag })}
+                onAuthMode={(authMode) => act('/auth-mode', { authMode })}
+                onTariff={(tariff) => act('/tariff', tariff)}
+              />
+            ) : (
+              <div className="action-bar muted">
+                <h2>Bench controls</h2>
+                <p>
+                  {selected
+                    ? `Charger is ${selected.connectionState}. Controls unlock when CMS status is online.`
+                    : 'Commission a charge point on the left and connect to the CMS to unlock controls.'}
+                </p>
+                {selected ? (
+                  <div className="btn-row" style={{ marginTop: '0.75rem' }}>
+                    <button
+                      type="button"
+                      className="accent"
+                      disabled={busy}
+                      onClick={() => act('/reconnect', { requireSubprotocol: selected.requireSubprotocol })}
+                    >
+                      Reconnect
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            )}
           </PanelChrome>
         )}
       </div>
@@ -374,40 +397,51 @@ export default function App() {
           onMove={(dx, dy) => moveFloat('right', dx, dy)}
           onDock={() => dock('right')}
         >
-          <ActionBar
-            charger={selected}
-            connectorId={activeConnector}
-            selectedConnectors={selectedConnectors}
-            busy={busy}
-            idTag={idTag}
-            onIdTagChange={setIdTag}
-            onPlug={(plugged) => act('/plug', { connectorId: activeConnector, plugged })}
-            onStart={(tag) => act('/start', { connectorId: activeConnector, idTag: tag })}
-            onStop={(reason) => act('/stop', { connectorId: activeConnector, reason })}
-            onEmergency={() => act('/emergency-stop', { connectorId: activeConnector })}
-            onFault={(errorCode) => act('/fault', { connectorId: activeConnector, errorCode })}
-            onClearFault={() => act('/clear-fault', { connectorId: activeConnector })}
-            onSuspend={(who) => act('/suspend', { connectorId: activeConnector, who })}
-            onType={(type) => act('/connector-type', { connectorId: activeConnector, type })}
-            onName={(name) => act('/connector-name', { connectorId: activeConnector, name })}
-            onPower={(powerKw) => act('/power', { connectorId: activeConnector, powerKw })}
-            onSoc={(cfg) =>
-              act('/soc', {
-                connectorId: activeConnector,
-                energyKwh: cfg.energyKwh,
-                batteryKwh: cfg.batteryKwh,
-                fillMode: cfg.fillMode,
-                fillEnergyKwh: cfg.fillEnergyKwh,
-                fillMoney: cfg.fillMoney,
-                fillMinutes: cfg.fillMinutes,
-              })
-            }
-            onReconnect={(requireSubprotocol) => act('/reconnect', { requireSubprotocol })}
-            onReset={(type) => act('/reset', { type })}
-            onAddTag={(tag) => act('/local-tag', { idTag: tag })}
-            onAuthMode={(authMode) => act('/auth-mode', { authMode })}
-            onTariff={(tariff) => act('/tariff', tariff)}
-          />
+          {controlsEnabled ? (
+            <ActionBar
+              charger={selected}
+              connectorId={activeConnector}
+              selectedConnectors={selectedConnectors}
+              busy={busy}
+              idTag={idTag}
+              onIdTagChange={setIdTag}
+              onPlug={(plugged) => act('/plug', { connectorId: activeConnector, plugged })}
+              onStart={(tag) => act('/start', { connectorId: activeConnector, idTag: tag })}
+              onStop={(reason) => act('/stop', { connectorId: activeConnector, reason })}
+              onEmergency={() => act('/emergency-stop', { connectorId: activeConnector })}
+              onFault={(errorCode) => act('/fault', { connectorId: activeConnector, errorCode })}
+              onClearFault={() => act('/clear-fault', { connectorId: activeConnector })}
+              onSuspend={(who) => act('/suspend', { connectorId: activeConnector, who })}
+              onType={(type) => act('/connector-type', { connectorId: activeConnector, type })}
+              onName={(name) => act('/connector-name', { connectorId: activeConnector, name })}
+              onPower={(powerKw) => act('/power', { connectorId: activeConnector, powerKw })}
+              onSoc={(cfg) =>
+                act('/soc', {
+                  connectorId: activeConnector,
+                  energyKwh: cfg.energyKwh,
+                  batteryKwh: cfg.batteryKwh,
+                  fillMode: cfg.fillMode,
+                  fillEnergyKwh: cfg.fillEnergyKwh,
+                  fillMoney: cfg.fillMoney,
+                  fillMinutes: cfg.fillMinutes,
+                })
+              }
+              onReconnect={(requireSubprotocol) => act('/reconnect', { requireSubprotocol })}
+              onReset={(type) => act('/reset', { type })}
+              onAddTag={(tag) => act('/local-tag', { idTag: tag })}
+              onAuthMode={(authMode) => act('/auth-mode', { authMode })}
+              onTariff={(tariff) => act('/tariff', tariff)}
+            />
+          ) : (
+            <div className="action-bar muted">
+              <h2>Bench controls</h2>
+              <p>
+                {selected
+                  ? `Charger is ${selected.connectionState}. Controls unlock when CMS status is online.`
+                  : 'Commission a charge point on the left and connect to the CMS to unlock controls.'}
+              </p>
+            </div>
+          )}
         </PanelChrome>
       )}
 

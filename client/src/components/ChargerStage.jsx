@@ -17,6 +17,8 @@ function YardFallback() {
 
 export default function ChargerStage({
   charger,
+  preview = false,
+  controlsEnabled = true,
   activeConnector,
   selectedConnectors,
   onSelectConnector,
@@ -38,6 +40,7 @@ export default function ChargerStage({
   const active = guns.find((c) => c.number === activeConnector) || guns[0];
   const reconnecting =
     charger.connectionState === 'reconnecting' || charger.connectionState === 'connecting';
+  const locked = !controlsEnabled;
 
   const targets = useMemo(() => {
     const set = new Set(selected);
@@ -88,7 +91,18 @@ export default function ChargerStage({
   };
 
   return (
-    <div className={`charger-stage roomy ${reconnecting ? 'is-reconnecting' : ''}`}>
+    <div
+      className={`charger-stage roomy ${reconnecting ? 'is-reconnecting' : ''} ${
+        locked ? 'controls-locked' : ''
+      }`}
+    >
+      {locked && (
+        <div className="stage-lock-banner" role="status">
+          {preview
+            ? 'Preview mode — commission a charger on the left and connect to the CMS to unlock controls.'
+            : `CMS ${charger.connectionState} — operator options unlock when status is online.`}
+        </div>
+      )}
       <Suspense fallback={<YardFallback />}>
         <EvYard3D
           connectors={charger.connectors}
@@ -105,32 +119,38 @@ export default function ChargerStage({
             currency: charger.currency,
             currencySymbol: charger.currencySymbol,
           }}
-          busy={busy}
+          busy={busy || locked}
           onSelectOutlet={(n) => {
-            onSelectConnector(n);
+            if (!locked) onSelectConnector(n);
           }}
           onToggleSelectOutlet={(n) => {
-            onToggleSelectConnector(n);
+            if (!locked) onToggleSelectConnector(n);
           }}
           onOutletPlug={(n, plugged) => {
+            if (locked) return;
             onSelectConnector(n);
             onPlug(n, plugged);
           }}
           onStart={(n) => {
+            if (locked) return;
             const t = freeTagFor(n);
             if (t !== tag) onIdTagChange(t);
             onStart(n, t);
           }}
           onStop={(n) => {
+            if (locked) return;
             onStop(n, 'Local');
           }}
           onEmergency={(n) => {
+            if (locked) return;
             onEmergency(n);
           }}
           onClearFault={(n) => {
+            if (locked) return;
             onClearFault(n);
           }}
           onTapCard={(n) => {
+            if (locked) return;
             const t = freeTagFor(n);
             if (t !== tag) onIdTagChange(t);
             onStart(n, t);
@@ -138,6 +158,7 @@ export default function ChargerStage({
         />
       </Suspense>
 
+      {controlsEnabled ? (
       <section className="cp-2d-panel" aria-label="Charge point controls">
         <header className="cp-2d-head">
           <div>
@@ -283,6 +304,7 @@ export default function ChargerStage({
           </div>
         </div>
       </section>
+      ) : null}
     </div>
   );
 }

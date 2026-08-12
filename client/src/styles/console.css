@@ -151,14 +151,20 @@
   -webkit-overflow-scrolling: touch;
 }
 
-.charger-stage.roomy {
-  width: 100%;
-  max-width: none;
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-  min-height: 0;
-  height: auto;
+.stage-lock-banner {
+  flex: 0 0 auto;
+  margin: 0 0 0.35rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--brand-muted);
+  background: var(--brand-soft);
+  color: var(--brand-deep);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
+}
+.charger-stage.controls-locked .ev-yard-3d.roomy {
+  /* keep tall preview yard even without operator panel */
 }
 
 .ev-yard-3d.roomy {
