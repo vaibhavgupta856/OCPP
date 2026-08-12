@@ -97,36 +97,52 @@ function makeSurfaceMaps({
   return { map, roughnessMap };
 }
 
-function makeKeyTexture(label, {
-  fill = '#e8f0ec',
-  text = '#1a1012',
-  disabled = false,
-} = {}) {
+function makeNfcPadTexture({ disabled = false } = {}) {
   const c = document.createElement('canvas');
   c.width = 512;
-  c.height = 256;
+  c.height = 192;
   const ctx = c.getContext('2d');
 
-  ctx.fillStyle = disabled ? '#6a7a72' : fill;
+  const g = ctx.createLinearGradient(0, 0, c.width, c.height);
+  g.addColorStop(0, disabled ? '#2a2e34' : '#1c1014');
+  g.addColorStop(0.55, disabled ? '#1a1d22' : '#2a1218');
+  g.addColorStop(1, disabled ? '#12151a' : '#12080c');
+  ctx.fillStyle = g;
   ctx.fillRect(0, 0, c.width, c.height);
 
-  // soft inner edge
-  ctx.strokeStyle = 'rgba(0,0,0,0.18)';
-  ctx.lineWidth = 10;
-  ctx.strokeRect(8, 8, c.width - 16, c.height - 16);
+  // subtle top sheen
+  const sheen = ctx.createLinearGradient(0, 0, 0, 70);
+  sheen.addColorStop(0, 'rgba(255,255,255,0.1)');
+  sheen.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = sheen;
+  ctx.fillRect(0, 0, c.width, 70);
 
-  const title = String(label ?? '');
-  let size = 92;
-  ctx.textAlign = 'center';
+  const cx = c.width * 0.22;
+  const cy = c.height * 0.5;
+  const stroke = disabled ? 'rgba(180,190,200,0.28)' : 'rgba(255,170,180,0.7)';
+  ctx.strokeStyle = stroke;
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 3; i += 1) {
+    const r = 18 + i * 16;
+    ctx.lineWidth = 3.5 - i * 0.4;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, -Math.PI * 0.55, Math.PI * 0.55);
+    ctx.stroke();
+  }
+  ctx.fillStyle = disabled ? 'rgba(200,210,220,0.35)' : '#ffb3bb';
+  ctx.beginPath();
+  ctx.arc(cx - 2, cy, 5.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  do {
-    ctx.font = `800 ${size}px system-ui, Segoe UI, Arial, sans-serif`;
-    if (ctx.measureText(title).width <= c.width * 0.86 || size <= 36) break;
-    size -= 4;
-  } while (size > 36);
-
-  ctx.fillStyle = disabled ? 'rgba(10,34,24,0.35)' : text;
-  ctx.fillText(title, c.width / 2, c.height / 2);
+  ctx.fillStyle = disabled ? 'rgba(200,210,220,0.4)' : '#ffe4e8';
+  ctx.font = '800 52px system-ui, Segoe UI, Arial, sans-serif';
+  ctx.fillText('TAP', 170, cy - 14);
+  ctx.fillStyle = disabled ? 'rgba(200,210,220,0.28)' : 'rgba(255,179,187,0.78)';
+  ctx.font = '700 28px system-ui, Segoe UI, Arial, sans-serif';
+  ctx.letterSpacing = '0.18em';
+  ctx.fillText('RFID  ·  NFC', 170, cy + 28);
 
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -189,26 +205,31 @@ function MushroomStop({ position, disabled, onClick }) {
   );
 }
 
-function RfidPad({ position, disabled, onClick, w = 0.78, h = 0.22 }) {
+function RfidPad({ position, disabled, onClick, w = 0.5, h = 0.12 }) {
   const [hovered, setHovered] = useState(false);
-  const texture = useMemo(
-    () =>
-      makeKeyTexture('TAP RFID / NFC', {
-        fill: '#3a1a22',
-        text: '#ffb3bb',
-        disabled: !!disabled,
-      }),
-    [disabled]
-  );
+  const texture = useMemo(() => makeNfcPadTexture({ disabled: !!disabled }), [disabled]);
 
   return (
     <group position={position}>
-      <mesh position={[0, 0, -0.01]}>
-        <boxGeometry args={[w + 0.08, h + 0.06, 0.04]} />
-        <meshStandardMaterial color="#1a1012" metalness={0.75} roughness={0.28} envMapIntensity={1.7} />
+      {/* Slim bezel */}
+      <mesh position={[0, 0, -0.008]}>
+        <boxGeometry args={[w + 0.045, h + 0.035, 0.028]} />
+        <meshStandardMaterial color="#101418" metalness={0.88} roughness={0.22} envMapIntensity={1.4} />
+      </mesh>
+      {/* Soft glow halo */}
+      <mesh position={[0, 0, 0.002]}>
+        <boxGeometry args={[w + 0.02, h + 0.016, 0.01]} />
+        <meshStandardMaterial
+          color="#c02434"
+          emissive="#c02434"
+          emissiveIntensity={hovered && !disabled ? 0.55 : disabled ? 0.05 : 0.22}
+          transparent
+          opacity={0.35}
+          depthWrite={false}
+        />
       </mesh>
       <mesh
-        position={[0, 0, 0.02]}
+        position={[0, 0, 0.016]}
         castShadow
         onClick={(e) => {
           e.stopPropagation();
@@ -224,21 +245,23 @@ function RfidPad({ position, disabled, onClick, w = 0.78, h = 0.22 }) {
           document.body.style.cursor = 'default';
         }}
       >
-        <boxGeometry args={[w, h, 0.035]} />
+        <boxGeometry args={[w, h, 0.024]} />
         <meshPhysicalMaterial
-          color="#3a1a22"
-          emissive={hovered && !disabled ? '#c02434' : '#9b1c2a'}
-          emissiveIntensity={hovered && !disabled ? 0.45 : 0.25}
-          metalness={0.7}
-          roughness={0.1}
-          clearcoat={1}
-          clearcoatRoughness={0.06}
-          envMapIntensity={1.8}
+          color={disabled ? '#2a2e34' : '#241016'}
+          emissive={hovered && !disabled ? '#c02434' : '#7a1520'}
+          emissiveIntensity={hovered && !disabled ? 0.4 : 0.18}
+          metalness={0.55}
+          roughness={0.18}
+          clearcoat={0.85}
+          clearcoatRoughness={0.1}
+          envMapIntensity={1.35}
+          transparent={disabled}
+          opacity={disabled ? 0.55 : 1}
         />
       </mesh>
-      <mesh position={[0, 0, 0.04]} renderOrder={3}>
-        <planeGeometry args={[w * 0.92, h * 0.78]} />
-        <meshBasicMaterial map={texture} transparent depthWrite={false} toneMapped={false} />
+      <mesh position={[0, 0, 0.032]} renderOrder={3}>
+        <planeGeometry args={[w * 0.94, h * 0.82]} />
+        <meshBasicMaterial map={texture} transparent alphaTest={0.05} depthWrite={false} toneMapped={false} />
       </mesh>
     </group>
   );
@@ -288,15 +311,15 @@ function EvGunHolster({
   const frontZ = wingD / 2 + 0.05;
   const s = side;
 
-  const dockedPos = useMemo(() => new THREE.Vector3(0, 0.16, frontZ + 0.12), [frontZ]);
-  const outPos = useMemo(() => new THREE.Vector3(s * 0.06, 0.1, frontZ + 0.32), [frontZ, s]);
+  const dockedPos = useMemo(() => new THREE.Vector3(0, 0.14, frontZ + 0.22), [frontZ]);
+  const outPos = useMemo(() => new THREE.Vector3(s * 0.08, 0.08, frontZ + 0.42), [frontZ, s]);
   const dockedEuler = useMemo(() => new THREE.Euler(0.18, 0, 0), []);
   const outEuler = useMemo(() => new THREE.Euler(0.52, s * 0.28, s * 0.1), [s]);
   const tmpPos = useMemo(() => new THREE.Vector3(), []);
   const tmpQuatA = useMemo(() => new THREE.Quaternion(), []);
   const tmpQuatB = useMemo(() => new THREE.Quaternion(), []);
   const tmpQuat = useMemo(() => new THREE.Quaternion(), []);
-  const glandPt = useMemo(() => new THREE.Vector3(0, 0.58, frontZ + 0.1), [frontZ]);
+  const glandPt = useMemo(() => new THREE.Vector3(0, 0.58, frontZ + 0.16), [frontZ]);
   const attachLocal = useMemo(() => new THREE.Vector3(0, 0.02, -0.05), []);
   const attachWorld = useMemo(() => new THREE.Vector3(), []);
   const mid1 = useMemo(() => new THREE.Vector3(), []);
@@ -333,8 +356,8 @@ function EvGunHolster({
   useEffect(() => {
     const end = dockedPos.clone().add(attachLocal);
     cablePts[0].copy(glandPt);
-    cablePts[1].set(s * 0.02, 0.35, frontZ + 0.14);
-    cablePts[2].set(s * 0.03, 0.05, frontZ + 0.16);
+    cablePts[1].set(s * 0.02, 0.35, frontZ + 0.18);
+    cablePts[2].set(s * 0.03, 0.05, frontZ + 0.2);
     cablePts[3].lerpVectors(glandPt, end, 0.75);
     cablePts[4].copy(end);
   }, [attachLocal, cablePts, dockedPos, frontZ, glandPt, s]);
@@ -407,22 +430,23 @@ function EvGunHolster({
       }
     }
 
-    // Update shared curve control points (no geometry allocation)
+    // Keep cable in front of the pocket so segments never z-fight the cradle
     const sag = THREE.MathUtils.lerp(0.16, 0.03, t);
+    const cableZMin = frontZ + 0.12;
     mid1.lerpVectors(glandPt, attachWorld, 0.3);
     mid1.y -= sag * 0.4;
     mid1.x += s * 0.028 * (1 - t * 0.35);
-    mid1.z += 0.03;
+    mid1.z = Math.max(mid1.z + 0.04, cableZMin);
 
     mid2.lerpVectors(glandPt, attachWorld, 0.55);
     mid2.y -= sag * 0.85;
     mid2.x += s * 0.04;
-    mid2.z += THREE.MathUtils.lerp(0.035, 0.07, t);
+    mid2.z = Math.max(mid2.z + THREE.MathUtils.lerp(0.05, 0.1, t), cableZMin);
 
     mid3.lerpVectors(glandPt, attachWorld, 0.8);
     mid3.y -= sag * 0.25;
     mid3.x += s * 0.025;
-    mid3.z += 0.02 * t;
+    mid3.z = Math.max(mid3.z + 0.03, cableZMin);
 
     cablePts[0].copy(glandPt);
     cablePts[1].copy(mid1);
@@ -506,36 +530,88 @@ function EvGunHolster({
         <meshStandardMaterial color={deep} metalness={0.88} roughness={0.28} />
       </mesh>
 
-      {/* Faceplate clearly in front of the wing body */}
-      <mesh position={[0, 0.05, frontZ]} castShadow>
-        <boxGeometry args={[wingW - 0.05, 1.34, 0.022]} />
-        <meshStandardMaterial
-          color="#eef1f5"
-          metalness={0.12}
-          roughness={0.22}
-          envMapIntensity={0.85}
-        />
+      {/* Faceplate split around the gun pocket — no coplanar sheet behind the connector */}
+      {(() => {
+        const fw = wingW - 0.05;
+        const fh = 1.34;
+        const fy = 0.05;
+        const pw = 0.28;
+        const ph = 0.56;
+        const py = 0.2;
+        const topH = (fh / 2 + fy) - (py + ph / 2);
+        const botH = (py - ph / 2) - (fy - fh / 2);
+        const sideW = (fw - pw) / 2;
+        const mkFace = (key, pos, args) => (
+          <mesh key={key} position={pos} castShadow>
+            <boxGeometry args={args} />
+            <meshStandardMaterial
+              color="#eef1f5"
+              metalness={0.12}
+              roughness={0.22}
+              envMapIntensity={0.85}
+            />
+          </mesh>
+        );
+        return (
+          <group>
+            {mkFace('face-top', [0, py + ph / 2 + topH / 2, frontZ], [fw, Math.max(topH, 0.02), 0.022])}
+            {mkFace('face-bot', [0, py - ph / 2 - botH / 2, frontZ], [fw, Math.max(botH, 0.02), 0.022])}
+            {mkFace('face-l', [-(pw / 2 + sideW / 2), py, frontZ], [Math.max(sideW, 0.02), ph, 0.022])}
+            {mkFace('face-r', [pw / 2 + sideW / 2, py, frontZ], [Math.max(sideW, 0.02), ph, 0.022])}
+          </group>
+        );
+      })()}
+
+      {/* Pocket back wall — deep behind the face opening */}
+      <mesh position={[0, 0.2, frontZ - 0.035]} castShadow>
+        <boxGeometry args={[0.26, 0.54, 0.02]} />
+        <meshStandardMaterial color="#0b0e12" metalness={0.35} roughness={0.75} />
+      </mesh>
+      {/* Pocket side / top / bottom walls (frame only — no nested solid boxes) */}
+      <mesh position={[-0.13, 0.2, frontZ - 0.01]} castShadow>
+        <boxGeometry args={[0.02, 0.54, 0.05]} />
+        <meshStandardMaterial color="#12161c" metalness={0.45} roughness={0.55} />
+      </mesh>
+      <mesh position={[0.13, 0.2, frontZ - 0.01]} castShadow>
+        <boxGeometry args={[0.02, 0.54, 0.05]} />
+        <meshStandardMaterial color="#12161c" metalness={0.45} roughness={0.55} />
+      </mesh>
+      <mesh position={[0, 0.46, frontZ - 0.01]} castShadow>
+        <boxGeometry args={[0.28, 0.02, 0.05]} />
+        <meshStandardMaterial color="#12161c" metalness={0.45} roughness={0.55} />
+      </mesh>
+      <mesh position={[0, -0.06, frontZ - 0.01]} castShadow>
+        <boxGeometry args={[0.28, 0.02, 0.05]} />
+        <meshStandardMaterial color="#12161c" metalness={0.45} roughness={0.55} />
+      </mesh>
+      {/* Slim front rim proud of the faceplate */}
+      <mesh position={[0, 0.46, frontZ + 0.02]} castShadow>
+        <boxGeometry args={[0.3, 0.02, 0.016]} />
+        <meshStandardMaterial color="#1a1f26" metalness={0.55} roughness={0.4} />
+      </mesh>
+      <mesh position={[0, -0.06, frontZ + 0.02]} castShadow>
+        <boxGeometry args={[0.3, 0.02, 0.016]} />
+        <meshStandardMaterial color="#1a1f26" metalness={0.55} roughness={0.4} />
+      </mesh>
+      <mesh position={[-0.14, 0.2, frontZ + 0.02]} castShadow>
+        <boxGeometry args={[0.02, 0.54, 0.016]} />
+        <meshStandardMaterial color="#1a1f26" metalness={0.55} roughness={0.4} />
+      </mesh>
+      <mesh position={[0.14, 0.2, frontZ + 0.02]} castShadow>
+        <boxGeometry args={[0.02, 0.54, 0.016]} />
+        <meshStandardMaterial color="#1a1f26" metalness={0.55} roughness={0.4} />
       </mesh>
 
-      <mesh position={[0, 0.22, frontZ + 0.035]} castShadow>
-        <boxGeometry args={[0.26, 0.52, 0.12]} />
-        <meshStandardMaterial color="#12161c" metalness={0.55} roughness={0.45} />
+      <mesh position={[0, 0.42, frontZ + 0.055]} castShadow>
+        <boxGeometry args={[0.24, 0.035, 0.05]} />
+        <meshStandardMaterial color={silver} metalness={0.9} roughness={0.16} />
       </mesh>
-      <mesh position={[0, 0.18, frontZ + 0.055]} castShadow>
-        <boxGeometry args={[0.2, 0.36, 0.08]} />
-        <meshStandardMaterial color="#1a1a1a" metalness={0.15} roughness={0.85} />
-      </mesh>
-      <mesh position={[0, 0.42, frontZ + 0.08]} castShadow>
-        <boxGeometry args={[0.24, 0.04, 0.1]} />
-        <meshPhysicalMaterial color={silver} metalness={0.92} roughness={0.12} clearcoat={0.8} />
-      </mesh>
-      <mesh position={[0, -0.02, frontZ + 0.08]} castShadow>
-        <boxGeometry args={[0.24, 0.045, 0.1]} />
-        <meshPhysicalMaterial
+      <mesh position={[0, -0.02, frontZ + 0.055]} castShadow>
+        <boxGeometry args={[0.24, 0.04, 0.05]} />
+        <meshStandardMaterial
           color={accent}
-          metalness={0.7}
-          roughness={0.18}
-          clearcoat={0.85}
+          metalness={0.65}
+          roughness={0.22}
           emissive={charging ? accent : '#000'}
           emissiveIntensity={charging ? 0.25 : 0}
         />
@@ -553,11 +629,11 @@ function EvGunHolster({
         />
       </mesh>
 
-      <mesh position={[0, 0.58, frontZ + 0.05]} rotation={[Math.PI / 2, 0, 0]}>
+      <mesh position={[0, 0.58, frontZ + 0.08]} rotation={[Math.PI / 2, 0, 0]}>
         <cylinderGeometry args={[0.045, 0.05, 0.05, 16]} />
         <meshStandardMaterial color="#0e1218" metalness={0.9} roughness={0.25} />
       </mesh>
-      <mesh position={[0, 0.58, frontZ + 0.08]} rotation={[Math.PI / 2, 0, 0]}>
+      <mesh position={[0, 0.58, frontZ + 0.12]} rotation={[Math.PI / 2, 0, 0]}>
         <cylinderGeometry args={[0.032, 0.032, 0.04, 14]} />
         <meshStandardMaterial color="#1c222c" metalness={0.4} roughness={0.55} />
       </mesh>
@@ -568,8 +644,8 @@ function EvGunHolster({
           <cylinderGeometry args={[0.032, 0.04, 0.07, 12]} />
           <meshStandardMaterial color="#14181e" metalness={0.35} roughness={0.55} />
         </mesh>
-        <mesh position={[0, -0.02, -0.02]} rotation={[0.35, 0, 0]} castShadow>
-          <boxGeometry args={[0.085, 0.2, 0.11]} />
+        <mesh position={[0, -0.02, -0.01]} rotation={[0.35, 0, 0]} castShadow>
+          <boxGeometry args={[0.085, 0.2, 0.08]} />
           <meshPhysicalMaterial
             ref={gripMatRef}
             color={grip}
@@ -581,12 +657,12 @@ function EvGunHolster({
             envMapIntensity={1.35}
           />
         </mesh>
-        <mesh position={[0, 0.02, 0.04]} rotation={[0.2, 0, 0]}>
+        <mesh position={[0, 0.02, 0.03]} rotation={[0.2, 0, 0]}>
           <torusGeometry args={[0.035, 0.01, 8, 16, Math.PI]} />
           <meshStandardMaterial color="#0d1014" metalness={0.85} roughness={0.25} />
         </mesh>
-        <mesh position={[0, 0.12, 0.02]} castShadow>
-          <boxGeometry args={[0.11, 0.14, 0.13]} />
+        <mesh position={[0, 0.12, 0.03]} castShadow>
+          <boxGeometry args={[0.11, 0.14, 0.09]} />
           <meshPhysicalMaterial
             ref={shellMatRef}
             color={shell}
@@ -596,8 +672,8 @@ function EvGunHolster({
             envMapIntensity={1.75}
           />
         </mesh>
-        <mesh position={[0, 0.22, 0.04]} rotation={[0.25, 0, 0]} castShadow>
-          <cylinderGeometry args={[0.055, 0.062, 0.1, 20]} />
+        <mesh position={[0, 0.22, 0.05]} rotation={[0.25, 0, 0]} castShadow>
+          <cylinderGeometry args={[0.055, 0.062, 0.09, 20]} />
           <meshPhysicalMaterial
             ref={headMatRef}
             color={silver}
@@ -607,18 +683,18 @@ function EvGunHolster({
             envMapIntensity={2}
           />
         </mesh>
-        <mesh position={[0, 0.28, 0.055]} rotation={[0.25, 0, 0]}>
+        <mesh position={[0, 0.28, 0.06]} rotation={[0.25, 0, 0]}>
           <cylinderGeometry args={[0.038, 0.042, 0.03, 16]} />
           <meshStandardMaterial color="#0a0c10" metalness={0.7} roughness={0.35} />
         </mesh>
         {[-0.015, 0.015].map((px) => (
-          <mesh key={px} position={[px, 0.3, 0.06]} rotation={[0.25, 0, 0]}>
+          <mesh key={px} position={[px, 0.3, 0.065]} rotation={[0.25, 0, 0]}>
             <cylinderGeometry args={[0.006, 0.006, 0.02, 8]} />
             <meshStandardMaterial color="#d4af37" metalness={1} roughness={0.15} />
           </mesh>
         ))}
-        <mesh position={[0, 0.16, 0.1]} castShadow>
-          <boxGeometry args={[0.04, 0.03, 0.035]} />
+        <mesh position={[0, 0.16, 0.085]} castShadow>
+          <boxGeometry args={[0.04, 0.03, 0.03]} />
           <meshStandardMaterial color="#e8edf2" metalness={0.8} roughness={0.2} />
         </mesh>
       </group>
@@ -935,8 +1011,8 @@ export default function MassiveChargerMesh({
       {/* RFID pad only — page/action buttons live on the touch screen (no duplicates) */}
       <RfidPad
         position={[0, 1.78, bodyD / 2 + 0.075]}
-        w={0.92}
-        h={0.22}
+        w={0.5}
+        h={0.12}
         disabled={busy}
         onClick={() => onTapCard?.(active?.number)}
       />

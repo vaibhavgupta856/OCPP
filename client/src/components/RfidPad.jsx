@@ -26,8 +26,8 @@ export default function RfidPad({ value, onChange, presets = [], onAddTag, onTap
     .filter(Boolean)
     .join(' ');
 
-  const label =
-    outcome === 'pending' ? '…' : outcome === 'ok' ? 'OK' : outcome === 'fail' ? 'NO' : 'TAP';
+  const status =
+    outcome === 'pending' ? 'WAIT' : outcome === 'ok' ? 'OK' : outcome === 'fail' ? 'NO' : 'TAP';
 
   return (
     <section className="rfid-pad">
@@ -37,10 +37,17 @@ export default function RfidPad({ value, onChange, presets = [], onAddTag, onTap
         className={faceClass}
         disabled={busy || !onTap || outcome === 'pending'}
         onClick={handleTap}
-        title="Tap RFID card to authorize and start"
+        title="Tap RFID / NFC to authorize and start"
       >
-        <div className="rfid-ring" />
-        <div className="rfid-core">{label}</div>
+        <span className="rfid-waves" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </span>
+        <span className="rfid-copy">
+          <span className="rfid-core">{status}</span>
+          <span className="rfid-sub">RFID · NFC</span>
+        </span>
       </button>
       <label>
         idTag
