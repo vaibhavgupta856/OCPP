@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 
-const KEY = 'massive-simulator-panel-layout-v3';
+const KEY = 'massive-simulator-panel-layout-v4';
 
 const DEFAULTS = {
   leftWidth: 210,
   rightWidth: 270,
-  traceHeight: 100,
+  traceHeight: 56,
   traceOpen: true,
   floats: {
     left: null,
@@ -55,8 +55,8 @@ export function usePanelLayout() {
       ...prev,
       traceHeight: clamp(
         typeof h === 'function' ? h(prev.traceHeight) : h,
-        72,
-        Math.round(window.innerHeight * 0.45)
+        48,
+        Math.round(window.innerHeight * 0.4)
       ),
     }));
   }, []);

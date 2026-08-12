@@ -39,7 +39,7 @@ export default function MessageTrace({
   onClear,
   open = true,
   onOpenChange,
-  bodyHeight = 72,
+  bodyHeight = 56,
 }) {
   const [tab, setTab] = useState('ocpp');
   const [scope, setScope] = useState('all'); // all | station | number

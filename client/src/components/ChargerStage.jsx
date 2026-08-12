@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo } from 'react';
 
 const EvYard3D = lazy(() => import('./scene3d/EvYard3D.jsx'));
 
@@ -38,7 +38,6 @@ export default function ChargerStage({
   const active = guns.find((c) => c.number === activeConnector) || guns[0];
   const reconnecting =
     charger.connectionState === 'reconnecting' || charger.connectionState === 'connecting';
-  const [hint, setHint] = useState('Use CP screen soft-keys · or the 2D operator panel below');
 
   const targets = useMemo(() => {
     const set = new Set(selected);
@@ -90,53 +89,6 @@ export default function ChargerStage({
 
   return (
     <div className={`charger-stage roomy ${reconnecting ? 'is-reconnecting' : ''}`}>
-      <div className="stage-toolbar">
-        <p className="stage-hint">{hint}</p>
-        <span className="meta-pill" title="Charge point firmware">
-          FW {charger.identity?.firmwareVersion || 'Massive-CPS-16.3.2.1'}
-          {charger.firmwareStatus && charger.firmwareStatus !== 'Idle'
-            ? ` · ${charger.firmwareStatus}`
-            : ''}
-        </span>
-        {charger.hardware && (
-          <span
-            className="meta-pill"
-            title={`${charger.hardware.cpuModel || ''} · ${charger.hardware.supply || ''} · ${
-              charger.hardware.cooling || ''
-            }`}
-          >
-            {charger.hardware.chargeMode || 'AC'} · CPU {charger.hardware.cpuPercent ?? '—'}% · RAM{' '}
-            {Math.round(charger.hardware.ramUsedMb || 0)}/{charger.hardware.ramTotalMb || '—'} MB ·{' '}
-            {charger.hardware.tempC != null ? `${charger.hardware.tempC}°C` : '—'}
-          </span>
-        )}
-        {charger.hardware && (
-          <span className="meta-pill" title="Flash / ROM usage">
-            ROM {Math.round((charger.hardware.romUsedMb || 0) / 1024 * 10) / 10}/
-            {Math.round((charger.hardware.romTotalMb || 0) / 1024)} GB
-          </span>
-        )}
-        <div className="multi-chips">
-          {guns.map((c) => {
-            const on = selected.includes(c.number);
-            return (
-              <button
-                key={c.number}
-                type="button"
-                className={`chip-select ${on ? 'on' : ''} ${c.number === activeConnector ? 'focus' : ''}`}
-                onClick={(e) => {
-                  if (e.shiftKey || e.ctrlKey || e.metaKey) onToggleSelectConnector(c.number);
-                  else onSelectConnector(c.number);
-                }}
-              >
-                C{c.number} · {c.powerKw} kW
-                <span className="chip-status">{c.status}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       <Suspense fallback={<YardFallback />}>
         <EvYard3D
           connectors={charger.connectors}
@@ -156,57 +108,49 @@ export default function ChargerStage({
           busy={busy}
           onSelectOutlet={(n) => {
             onSelectConnector(n);
-            setHint(`Focus C${n}`);
           }}
           onToggleSelectOutlet={(n) => {
             onToggleSelectConnector(n);
-            setHint(`Multi-select toggled C${n}`);
           }}
           onOutletPlug={(n, plugged) => {
             onSelectConnector(n);
             onPlug(n, plugged);
-            setHint(`${plugged ? 'Plugged' : 'Unplugged'} C${n}`);
           }}
           onStart={(n) => {
             const t = freeTagFor(n);
             if (t !== tag) onIdTagChange(t);
             onStart(n, t);
-            setHint(`Start C${n} with ${t}`);
           }}
           onStop={(n) => {
             onStop(n, 'Local');
-            setHint(`Stop C${n}`);
           }}
           onEmergency={(n) => {
             onEmergency(n);
-            setHint(`E-Stop C${n}`);
           }}
           onClearFault={(n) => {
             onClearFault(n);
-            setHint(`Cleared fault C${n}`);
           }}
           onTapCard={(n) => {
             const t = freeTagFor(n);
             if (t !== tag) onIdTagChange(t);
             onStart(n, t);
-            setHint(`Card tap → C${n} with ${t}`);
           }}
         />
       </Suspense>
 
-      <section className="cp-2d-panel" aria-label="Charge point controls">
+      <details className="cp-2d-panel cp-2d-collapsible">
+        <summary className="cp-2d-summary">
+          Operator panel · {targetLabel} · {active.status}
+          {active.transactionId ? ` · Tx #${active.transactionId}` : ''}
+        </summary>
+
         <header className="cp-2d-head">
           <div>
-            <h3>Operator panel</h3>
+            <h3>Controls</h3>
             <p>
               Acting on <strong>{targetLabel}</strong>
-              {active.transactionId ? ` · Tx #${active.transactionId}` : ''}
-              {` · ${active.status}`}
               {` · ${((active.meterWh || 0) / 1000).toFixed(2)} kWh`}
               {` · ${charger.currencySymbol || '₹'}${Number(active.sessionCost ?? 0).toFixed(2)}`}
-              {active.lastSessionCost != null && !active.transactionId
-                ? ` · last ${charger.currencySymbol || '₹'}${Number(active.lastSessionCost).toFixed(2)}`
-                : ''}
             </p>
           </div>
           <label className="stage-tag inline">
@@ -247,10 +191,7 @@ export default function ChargerStage({
             </button>
           ) : null}
         </header>
-        <p className="cp-2d-tip">
-          <strong>Local or CMS</strong>: demo tags (CARD-…) work locally; paste a Massive RFID for CMS-side auth.
-          Use <strong>CMS only</strong> when testing real Massive RFID cards.
-        </p>
+
         {tagsInUse.size > 0 ? (
           <p className="cp-2d-tip">
             In use now:{' '}
@@ -258,7 +199,6 @@ export default function ChargerStage({
               .filter((g) => g.transactionId && g.idTag)
               .map((g) => `C${g.number}=${g.idTag}`)
               .join(' · ')}
-            . Each connector needs its own CMS-accepted RFID for parallel charging.
           </p>
         ) : null}
 
@@ -271,7 +211,7 @@ export default function ChargerStage({
               runOnTargets((id) => {
                 const g = guns.find((x) => x.number === id);
                 return onPlug(id, !g?.cablePlugged);
-              }).then(() => setHint(`${allPlugged ? 'Unplugged' : 'Plugged'} ${targetLabel}`))
+              })
             }
           >
             {allPlugged ? 'Unplug' : 'Plug'} cable
@@ -280,11 +220,7 @@ export default function ChargerStage({
             type="button"
             className="cp-btn accent"
             disabled={busy || anyTx}
-            onClick={() =>
-              runOnTargets((id) => onStart(id, freeTagFor(id))).then(() =>
-                setHint(`Start ${targetLabel}`)
-              )
-            }
+            onClick={() => runOnTargets((id) => onStart(id, freeTagFor(id)))}
           >
             Start charge
           </button>
@@ -292,9 +228,7 @@ export default function ChargerStage({
             type="button"
             className="cp-btn"
             disabled={busy || !anyTx}
-            onClick={() =>
-              runOnTargets((id) => onStop(id, 'Local')).then(() => setHint(`Stop ${targetLabel}`))
-            }
+            onClick={() => runOnTargets((id) => onStop(id, 'Local'))}
           >
             Stop charge
           </button>
@@ -302,11 +236,7 @@ export default function ChargerStage({
             type="button"
             className="cp-btn accent"
             disabled={busy}
-            onClick={() =>
-              runOnTargets((id) => onStart(id, freeTagFor(id))).then(() =>
-                setHint(`Card auth → ${targetLabel}`)
-              )
-            }
+            onClick={() => runOnTargets((id) => onStart(id, freeTagFor(id)))}
           >
             Tap RFID / Card
           </button>
@@ -314,9 +244,7 @@ export default function ChargerStage({
             type="button"
             className="cp-btn danger"
             disabled={busy || !anyTx}
-            onClick={() =>
-              runOnTargets((id) => onEmergency(id)).then(() => setHint(`E-Stop ${targetLabel}`))
-            }
+            onClick={() => runOnTargets((id) => onEmergency(id))}
           >
             Emergency stop
           </button>
@@ -325,9 +253,7 @@ export default function ChargerStage({
               type="button"
               className="cp-btn warn"
               disabled={busy}
-              onClick={() =>
-                runOnTargets((id) => onClearFault(id)).then(() => setHint(`Cleared ${targetLabel}`))
-              }
+              onClick={() => runOnTargets((id) => onClearFault(id))}
             >
               Clear fault
             </button>
@@ -355,12 +281,8 @@ export default function ChargerStage({
               </label>
             ))}
           </div>
-          <p className="cp-2d-tip">
-            Shift/Ctrl-click outlet chips above to multi-select · 3D soft-keys control the focused
-            connector
-          </p>
         </div>
-      </section>
+      </details>
     </div>
   );
 }
