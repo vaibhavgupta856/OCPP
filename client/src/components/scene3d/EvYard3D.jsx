@@ -1,8 +1,32 @@
-import { Component, Suspense, useMemo } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { Component, Suspense, useEffect, useMemo } from 'react';
+import { Canvas, useThree } from '@react-three/fiber';
 import { ContactShadows, Environment, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import MassiveChargerMesh from './MassiveChargerMesh.jsx';
+
+/** Front-facing framing — pull back so pedestal top/LED + side guns all fit */
+const FRONT_CAM = [0, 0.95, 7.2];
+const FRONT_TARGET = [0, 2.15, 0];
+
+function FrontFacingCamera() {
+  const { camera, controls, gl } = useThree();
+  useEffect(() => {
+    camera.position.set(...FRONT_CAM);
+    camera.near = 0.1;
+    camera.far = 80;
+    camera.fov = 44;
+    camera.updateProjectionMatrix();
+    camera.lookAt(...FRONT_TARGET);
+    gl.domElement.style.cursor = 'default';
+    if (controls) {
+      controls.target.set(...FRONT_TARGET);
+      controls.minDistance = 5;
+      controls.maxDistance = 14;
+      controls.update();
+    }
+  }, [camera, controls, gl]);
+  return null;
+}
 
 /** If HDR env fails/suspends oddly, keep the charger visible */
 class EnvGuard extends Component {
@@ -158,12 +182,15 @@ function SceneContent(props) {
       <OrbitControls
         makeDefault
         enablePan
-        minPolarAngle={0.2}
+        enableDamping
+        dampingFactor={0.08}
+        minPolarAngle={0.25}
         maxPolarAngle={1.45}
-        minDistance={3.5}
-        maxDistance={16}
-        target={[0, 2.1, 0]}
+        minDistance={5}
+        maxDistance={14}
+        target={FRONT_TARGET}
       />
+      <FrontFacingCamera />
     </>
   );
 }
@@ -179,7 +206,7 @@ export default function EvYard3D(props) {
       <Canvas
         shadows
         dpr={[1, 1.75]}
-        camera={{ position: [5.8, 3.8, 7.2], fov: 38 }}
+        camera={{ position: FRONT_CAM, fov: 44, near: 0.1, far: 80 }}
         gl={{
           antialias: true,
           alpha: false,
@@ -187,8 +214,10 @@ export default function EvYard3D(props) {
           toneMapping: THREE.ACESFilmicToneMapping,
           toneMappingExposure: 1.22,
         }}
-        onCreated={({ gl }) => {
+        onCreated={({ gl, camera }) => {
           gl.setClearColor('#e8ecf2');
+          gl.domElement.style.cursor = 'default';
+          camera.lookAt(...FRONT_TARGET);
         }}
       >
         <SceneContent {...props} />

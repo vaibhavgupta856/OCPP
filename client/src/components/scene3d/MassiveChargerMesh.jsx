@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import ChargerLcdScreen from './ChargerLcdScreen.jsx';
@@ -135,95 +135,6 @@ function makeKeyTexture(label, {
   return tex;
 }
 
-function SoftKey({
-  position,
-  w = 0.38,
-  h = 0.18,
-  color = '#e8f0ec',
-  label,
-  disabled,
-  onClick,
-  accent = false,
-  danger = false,
-}) {
-  const [hovered, setHovered] = useState(false);
-  const [pressed, setPressed] = useState(false);
-  const zPush = pressed ? -0.012 : 0;
-  const fill = danger ? '#c62828' : color;
-  const textColor = danger ? '#ffffff' : '#1a1012';
-
-  const texture = useMemo(
-    () => makeKeyTexture(label, { fill, text: textColor, disabled: !!disabled }),
-    [label, fill, textColor, disabled]
-  );
-
-  return (
-    <group position={position}>
-      <mesh position={[0, 0, -0.014]}>
-        <boxGeometry args={[w + 0.05, h + 0.05, 0.032]} />
-        <meshStandardMaterial color="#12151a" metalness={0.85} roughness={0.28} envMapIntensity={1.8} />
-      </mesh>
-      <mesh
-        position={[0, 0, 0.012 + zPush]}
-        castShadow
-        onPointerOver={(e) => {
-          e.stopPropagation();
-          if (!disabled) setHovered(true);
-          document.body.style.cursor = disabled ? 'not-allowed' : 'pointer';
-        }}
-        onPointerOut={() => {
-          setHovered(false);
-          setPressed(false);
-          document.body.style.cursor = 'default';
-        }}
-        onPointerDown={(e) => {
-          e.stopPropagation();
-          if (!disabled) setPressed(true);
-        }}
-        onPointerUp={(e) => {
-          e.stopPropagation();
-          setPressed(false);
-          if (!disabled) onClick?.(e);
-        }}
-      >
-        <boxGeometry args={[w, h, 0.036]} />
-        <meshPhysicalMaterial
-          color={fill}
-          emissive={
-            hovered && !disabled
-              ? danger
-                ? '#ff1744'
-                : accent
-                  ? '#c02434'
-                  : '#6b7280'
-              : danger
-                ? '#7f1010'
-                : '#000000'
-          }
-          emissiveIntensity={hovered && !disabled ? 0.28 : danger ? 0.1 : 0}
-          metalness={0.35}
-          roughness={0.12}
-          clearcoat={1}
-          clearcoatRoughness={0.08}
-          envMapIntensity={1.55}
-          transparent={disabled}
-          opacity={disabled ? 0.55 : 1}
-        />
-      </mesh>
-      {/* Label on front face only — always readable */}
-      <mesh position={[0, 0, 0.034 + zPush]} renderOrder={2}>
-        <planeGeometry args={[w * 0.94, h * 0.82]} />
-        <meshBasicMaterial
-          map={texture}
-          transparent
-          depthWrite={false}
-          toneMapped={false}
-        />
-      </mesh>
-    </group>
-  );
-}
-
 function MushroomStop({ position, disabled, onClick }) {
   const [hovered, setHovered] = useState(false);
   const [pressed, setPressed] = useState(false);
@@ -242,7 +153,7 @@ function MushroomStop({ position, disabled, onClick }) {
         onPointerOver={(e) => {
           e.stopPropagation();
           if (!disabled) setHovered(true);
-          document.body.style.cursor = disabled ? 'not-allowed' : 'pointer';
+          document.body.style.cursor = disabled ? 'not-allowed' : 'default';
         }}
         onPointerOut={() => {
           setHovered(false);
@@ -306,7 +217,7 @@ function RfidPad({ position, disabled, onClick, w = 0.78, h = 0.22 }) {
         onPointerOver={(e) => {
           e.stopPropagation();
           if (!disabled) setHovered(true);
-          document.body.style.cursor = disabled ? 'not-allowed' : 'pointer';
+          document.body.style.cursor = disabled ? 'not-allowed' : 'default';
         }}
         onPointerOut={() => {
           setHovered(false);
@@ -354,168 +265,415 @@ function EvGunHolster({
   onToggle,
   onPlug,
 }) {
-  const grip = focused ? white : selected ? '#d4dbe3' : '#3a414c';
-  const nose = charging ? '#ffb3bb' : plugged ? accent : silver;
+  const gunRef = useRef();
+  const cableMeshRef = useRef();
+  const motion = useRef(plugged || charging ? 1 : 0);
+  const cableMatRef = useRef();
+  const gripMatRef = useRef();
+  const shellMatRef = useRef();
+  const headMatRef = useRef();
+  const ledMatRef = useRef();
+  const blinkPhase = useRef(0);
 
-  // Keep wing fully OUTSIDE the cabinet with a tiny air gap to prevent z-fighting
-  const wingW = 0.34;
-  const wingD = bodyD * 0.86;
+  const grip = focused ? '#f4f6f8' : selected ? '#cfd6de' : '#2a3038';
+  const shell = plugged && !charging ? '#c02434' : '#b8c0c8';
+  const led = plugged && !charging ? '#ffb020' : focused ? '#5ad0ff' : '#3a4450';
+
+  const wingW = 0.38;
+  const wingD = bodyD * 0.9;
   const gap = 0.012;
   const x = side * (bodyW / 2 + gap + wingW / 2);
-  const frontZ = wingD / 2 + 0.01;
+  const frontZ = wingD / 2 + 0.012;
+  const s = side;
+
+  const dockedPos = useMemo(() => new THREE.Vector3(0, 0.16, frontZ + 0.12), [frontZ]);
+  const outPos = useMemo(() => new THREE.Vector3(s * 0.06, 0.1, frontZ + 0.32), [frontZ, s]);
+  const dockedEuler = useMemo(() => new THREE.Euler(0.18, 0, 0), []);
+  const outEuler = useMemo(() => new THREE.Euler(0.52, s * 0.28, s * 0.1), [s]);
+  const tmpPos = useMemo(() => new THREE.Vector3(), []);
+  const tmpQuatA = useMemo(() => new THREE.Quaternion(), []);
+  const tmpQuatB = useMemo(() => new THREE.Quaternion(), []);
+  const tmpQuat = useMemo(() => new THREE.Quaternion(), []);
+  const glandPt = useMemo(() => new THREE.Vector3(0, 0.58, frontZ + 0.1), [frontZ]);
+  const attachLocal = useMemo(() => new THREE.Vector3(0, 0.02, -0.05), []);
+  const attachWorld = useMemo(() => new THREE.Vector3(), []);
+  const mid1 = useMemo(() => new THREE.Vector3(), []);
+  const mid2 = useMemo(() => new THREE.Vector3(), []);
+  const mid3 = useMemo(() => new THREE.Vector3(), []);
+  const cablePts = useMemo(
+    () => [
+      new THREE.Vector3(),
+      new THREE.Vector3(),
+      new THREE.Vector3(),
+      new THREE.Vector3(),
+      new THREE.Vector3(),
+    ],
+    []
+  );
+  const cableCurve = useMemo(() => new THREE.CatmullRomCurve3(cablePts), [cablePts]);
+  const cableColor = useMemo(() => new THREE.Color('#1e242c'), []);
+  const cableColorOut = useMemo(() => new THREE.Color('#8b1e2a'), []);
+  const greenHi = useMemo(() => new THREE.Color('#39ff88'), []);
+  const greenLo = useMemo(() => new THREE.Color('#0d3d24'), []);
+  const greenMid = useMemo(() => new THREE.Color('#1fa855'), []);
+  const shellIdle = useMemo(() => new THREE.Color('#b8c0c8'), []);
+  const shellPlug = useMemo(() => new THREE.Color('#c02434'), []);
+  const silverCol = useMemo(() => new THREE.Color(silver || '#c8d0d8'), [silver]);
+  const blinkTmp = useMemo(() => new THREE.Color(), []);
+
+  // Continuous cable tube — rebuilt each frame along gland → gun
+  const initialCurve = useMemo(() => {
+    const end = dockedPos.clone().add(new THREE.Vector3(0, 0.02, -0.05));
+    return new THREE.CatmullRomCurve3([
+      glandPt.clone(),
+      new THREE.Vector3(s * 0.02, 0.35, frontZ + 0.14),
+      new THREE.Vector3(s * 0.03, 0.05, frontZ + 0.16),
+      end,
+    ]);
+  }, [dockedPos, frontZ, glandPt, s]);
+
+  const cableGeo = useMemo(
+    () => new THREE.TubeGeometry(initialCurve, 24, 0.027, 8, false),
+    [initialCurve]
+  );
+
+  const lastCableT = useRef(-1);
+
+  useEffect(() => () => {
+    cableGeo.dispose();
+    if (cableMeshRef.current?.geometry && cableMeshRef.current.geometry !== cableGeo) {
+      cableMeshRef.current.geometry.dispose();
+    }
+  }, [cableGeo]);
+
+  useFrame((_, delta) => {
+    const target = charging ? 1 : plugged ? 0.72 : 0;
+    const dt = Math.min(delta, 0.05);
+    // Single damp only — double smoothstep warped mid-travel and looked kinked
+    motion.current = THREE.MathUtils.damp(motion.current, target, 2.35, dt);
+    const t = motion.current;
+    // Pull straight out first, then tilt — avoids twisty mid-path distortion
+    const tPos = t;
+    const tRot = t * t * (3 - 2 * t);
+
+    if (gunRef.current) {
+      tmpPos.lerpVectors(dockedPos, outPos, tPos);
+      gunRef.current.position.copy(tmpPos);
+      tmpQuatA.setFromEuler(dockedEuler);
+      tmpQuatB.setFromEuler(outEuler);
+      tmpQuat.slerpQuaternions(tmpQuatA, tmpQuatB, tRot);
+      gunRef.current.quaternion.copy(tmpQuat);
+
+      attachWorld.copy(attachLocal).applyQuaternion(tmpQuat).add(tmpPos);
+    } else {
+      attachWorld.copy(dockedPos).add(attachLocal);
+    }
+
+    if (cableMatRef.current?.color) {
+      cableMatRef.current.color.copy(cableColor).lerp(cableColorOut, t);
+    }
+
+    // Green blink on connector while charging
+    blinkPhase.current += dt;
+    if (charging) {
+      const pulse = 0.5 + 0.5 * Math.sin(blinkPhase.current * 5.5); // ~0.9 Hz soft blink
+      blinkTmp.copy(greenLo).lerp(greenHi, pulse);
+      if (shellMatRef.current) {
+        shellMatRef.current.color.copy(blinkTmp);
+        shellMatRef.current.emissive.copy(greenMid);
+        shellMatRef.current.emissiveIntensity = 0.25 + pulse * 0.85;
+      }
+      if (headMatRef.current) {
+        headMatRef.current.color.copy(blinkTmp);
+        headMatRef.current.emissive.copy(greenHi);
+        headMatRef.current.emissiveIntensity = 0.15 + pulse * 0.7;
+      }
+      if (gripMatRef.current) {
+        gripMatRef.current.emissive.copy(greenMid);
+        gripMatRef.current.emissiveIntensity = 0.1 + pulse * 0.45;
+      }
+      if (ledMatRef.current) {
+        ledMatRef.current.color.copy(greenHi);
+        ledMatRef.current.emissive.copy(greenHi);
+        ledMatRef.current.emissiveIntensity = 0.4 + pulse * 1.2;
+      }
+    } else {
+      if (shellMatRef.current) {
+        shellMatRef.current.color.copy(plugged ? shellPlug : shellIdle);
+        shellMatRef.current.emissive.set('#000000');
+        shellMatRef.current.emissiveIntensity = 0;
+      }
+      if (headMatRef.current) {
+        headMatRef.current.color.copy(silverCol);
+        headMatRef.current.emissive.set('#000000');
+        headMatRef.current.emissiveIntensity = 0;
+      }
+      if (gripMatRef.current) {
+        gripMatRef.current.emissive.set(selected ? accent : '#000000');
+        gripMatRef.current.emissiveIntensity = selected ? 0.15 : 0;
+      }
+      if (ledMatRef.current) {
+        const ledC = plugged ? '#ffb020' : focused ? '#5ad0ff' : '#3a4450';
+        ledMatRef.current.color.set(ledC);
+        ledMatRef.current.emissive.set(ledC);
+        ledMatRef.current.emissiveIntensity = plugged ? 0.7 : focused ? 0.55 : 0.15;
+      }
+    }
+
+    // Keep cable locked to gun while moving; skip rebuild at rest to avoid GC hitch
+    const settled = Math.abs(target - motion.current) < 0.0005;
+    if (settled && lastCableT.current >= 0 && Math.abs(t - lastCableT.current) < 0.001) {
+      return;
+    }
+    lastCableT.current = t;
+
+    // Keep cable locked to gun every frame (stepped rebuild caused visible kink)
+    const sag = THREE.MathUtils.lerp(0.16, 0.03, t);
+    mid1.lerpVectors(glandPt, attachWorld, 0.3);
+    mid1.y -= sag * 0.4;
+    mid1.x += s * 0.028 * (1 - t * 0.35);
+    mid1.z += 0.03;
+
+    mid2.lerpVectors(glandPt, attachWorld, 0.55);
+    mid2.y -= sag * 0.85;
+    mid2.x += s * 0.04;
+    mid2.z += THREE.MathUtils.lerp(0.035, 0.07, t);
+
+    mid3.lerpVectors(glandPt, attachWorld, 0.8);
+    mid3.y -= sag * 0.25;
+    mid3.x += s * 0.025;
+    mid3.z += 0.02 * t;
+
+    cablePts[0].copy(glandPt);
+    cablePts[1].copy(mid1);
+    cablePts[2].copy(mid2);
+    cablePts[3].copy(mid3);
+    cablePts[4].copy(attachWorld);
+
+    if (cableMeshRef.current) {
+      const prev = cableMeshRef.current.geometry;
+      cableMeshRef.current.geometry = new THREE.TubeGeometry(cableCurve, 24, 0.027, 8, false);
+      if (prev && prev !== cableGeo) prev.dispose();
+    }
+  });
+
+  const gunHandlers = {
+    onClick: (e) => {
+      e.stopPropagation();
+      if (e.shiftKey || e.ctrlKey || e.metaKey) onToggle?.();
+      else onSelect?.();
+    },
+    onContextMenu: (e) => {
+      e.stopPropagation();
+      e.nativeEvent?.preventDefault?.();
+      onToggle?.();
+    },
+    onDoubleClick: (e) => {
+      e.stopPropagation();
+      onPlug?.();
+    },
+    onPointerOver: (e) => {
+      e.stopPropagation();
+      document.body.style.cursor = 'default';
+    },
+    onPointerOut: () => {
+      document.body.style.cursor = 'default';
+    },
+  };
 
   return (
     <group position={[x, y, 0]}>
-      {/* Side dock panel — abuts cabinet, does not intersect it */}
       <mesh castShadow receiveShadow>
-        <boxGeometry args={[wingW, 1.5, wingD]} />
+        <boxGeometry args={[wingW, 1.55, wingD]} />
         <meshPhysicalMaterial
           map={bodyMap}
           color={cabinet}
-          metalness={0.82}
-          roughness={0.18}
-          clearcoat={0.65}
-          envMapIntensity={1.55}
+          metalness={0.84}
+          roughness={0.16}
+          clearcoat={0.7}
+          envMapIntensity={1.6}
           polygonOffset
           polygonOffsetFactor={1}
           polygonOffsetUnits={1}
         />
       </mesh>
 
-      {/* Inner seam strip facing the cabinet (decorative join, still outside) */}
-      <mesh position={[-side * (wingW / 2 - 0.012), 0, 0]} castShadow>
-        <boxGeometry args={[0.02, 1.48, wingD * 0.95]} />
-        <meshStandardMaterial color={deep} metalness={0.7} roughness={0.35} />
+      <mesh position={[s * (wingW / 2 - 0.02), 0.05, 0]} castShadow>
+        <boxGeometry args={[0.04, 1.4, wingD * 0.88]} />
+        <meshStandardMaterial color={deep} metalness={0.75} roughness={0.32} />
       </mesh>
 
-      {/* Foot on plinth */}
-      <mesh position={[0, -0.82, 0]} castShadow receiveShadow>
-        <boxGeometry args={[wingW + 0.04, 0.14, wingD * 0.92]} />
-        <meshStandardMaterial color={deep} metalness={0.85} roughness={0.3} />
+      <mesh position={[-s * (wingW / 2 - 0.012), 0.02, 0]} castShadow>
+        <boxGeometry args={[0.018, 1.5, wingD * 0.96]} />
+        <meshStandardMaterial color="#0a0c10" metalness={0.65} roughness={0.4} />
       </mesh>
 
-      {/* Front face plate — pushed forward so it never shares a plane with the body */}
-      <mesh position={[0, 0.02, frontZ]} castShadow>
-        <boxGeometry args={[wingW - 0.06, 1.35, 0.035]} />
+      <mesh position={[0, -0.86, 0]} castShadow receiveShadow>
+        <boxGeometry args={[wingW + 0.05, 0.16, wingD * 0.94]} />
+        <meshStandardMaterial color={deep} metalness={0.88} roughness={0.28} />
+      </mesh>
+
+      <mesh position={[0, 0.05, frontZ]} castShadow>
+        <boxGeometry args={[wingW - 0.05, 1.38, 0.04]} />
         <meshPhysicalMaterial
-          color="#eceff3"
-          metalness={0.22}
-          roughness={0.12}
+          color="#eef1f5"
+          metalness={0.18}
+          roughness={0.1}
           clearcoat={1}
-          clearcoatRoughness={0.06}
-          envMapIntensity={1.45}
+          clearcoatRoughness={0.05}
+          envMapIntensity={1.55}
         />
       </mesh>
 
-      {/* Holster pocket */}
-      <mesh position={[0, 0.2, frontZ + 0.04]} castShadow>
-        <boxGeometry args={[0.2, 0.4, 0.1]} />
-        <meshStandardMaterial color={deep} metalness={0.7} roughness={0.35} />
+      <mesh position={[0, 0.22, frontZ + 0.035]} castShadow>
+        <boxGeometry args={[0.26, 0.52, 0.12]} />
+        <meshStandardMaterial color="#12161c" metalness={0.55} roughness={0.45} />
       </mesh>
-      <mesh position={[0, 0.0, frontZ + 0.07]} castShadow>
-        <boxGeometry args={[0.22, 0.05, 0.07]} />
-        <meshStandardMaterial color={accent} metalness={0.65} roughness={0.2} />
+      <mesh position={[0, 0.18, frontZ + 0.055]} castShadow>
+        <boxGeometry args={[0.2, 0.36, 0.08]} />
+        <meshStandardMaterial color="#1a1a1a" metalness={0.15} roughness={0.85} />
       </mesh>
-      <mesh position={[0, 0.4, frontZ + 0.07]} castShadow>
-        <boxGeometry args={[0.22, 0.045, 0.07]} />
-        <meshStandardMaterial color={deep} metalness={0.8} roughness={0.25} />
+      <mesh position={[0, 0.42, frontZ + 0.08]} castShadow>
+        <boxGeometry args={[0.24, 0.04, 0.1]} />
+        <meshPhysicalMaterial color={silver} metalness={0.92} roughness={0.12} clearcoat={0.8} />
+      </mesh>
+      <mesh position={[0, -0.02, frontZ + 0.08]} castShadow>
+        <boxGeometry args={[0.24, 0.045, 0.1]} />
+        <meshPhysicalMaterial
+          color={accent}
+          metalness={0.7}
+          roughness={0.18}
+          clearcoat={0.85}
+          emissive={charging ? accent : '#000'}
+          emissiveIntensity={charging ? 0.25 : 0}
+        />
       </mesh>
 
-      {/* Gun in pocket */}
-      <group
-        position={[0, 0.18, frontZ + 0.1]}
-        rotation={[0.1, 0, 0]}
-        onClick={(e) => {
-          e.stopPropagation();
-          if (e.shiftKey || e.ctrlKey || e.metaKey) onToggle?.();
-          else onSelect?.();
-        }}
-        onContextMenu={(e) => {
-          e.stopPropagation();
-          e.nativeEvent?.preventDefault?.();
-          onToggle?.();
-        }}
-        onDoubleClick={(e) => {
-          e.stopPropagation();
-          onPlug?.();
-        }}
-        onPointerOver={(e) => {
-          e.stopPropagation();
-          document.body.style.cursor = 'pointer';
-        }}
-        onPointerOut={() => {
-          document.body.style.cursor = 'default';
-        }}
-      >
-        <mesh castShadow>
-          <boxGeometry args={[0.1, 0.24, 0.1]} />
+      <mesh position={[0, 0.55, frontZ + 0.04]}>
+        <boxGeometry args={[0.12, 0.035, 0.02]} />
+        <meshStandardMaterial
+          ref={ledMatRef}
+          color={led}
+          emissive={led}
+          emissiveIntensity={plugged ? 0.7 : focused ? 0.55 : 0.15}
+          metalness={0.2}
+          roughness={0.35}
+        />
+      </mesh>
+
+      <mesh position={[0, 0.58, frontZ + 0.05]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.045, 0.05, 0.05, 16]} />
+        <meshStandardMaterial color="#0e1218" metalness={0.9} roughness={0.25} />
+      </mesh>
+      <mesh position={[0, 0.58, frontZ + 0.08]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.032, 0.032, 0.04, 14]} />
+        <meshStandardMaterial color="#1c222c" metalness={0.4} roughness={0.55} />
+      </mesh>
+
+      <group ref={gunRef} {...gunHandlers}>
+        {/* Cable boot / strain relief where cable enters gun */}
+        <mesh position={[0, 0.02, -0.05]} rotation={[1.15, 0, 0]} castShadow>
+          <cylinderGeometry args={[0.032, 0.04, 0.07, 12]} />
+          <meshStandardMaterial color="#14181e" metalness={0.35} roughness={0.55} />
+        </mesh>
+        <mesh position={[0, -0.02, -0.02]} rotation={[0.35, 0, 0]} castShadow>
+          <boxGeometry args={[0.085, 0.2, 0.11]} />
           <meshPhysicalMaterial
+            ref={gripMatRef}
             color={grip}
-            emissive={charging ? '#ffb3bb' : selected ? accent : '#000'}
-            emissiveIntensity={charging ? 0.4 : selected ? 0.18 : 0}
-            metalness={0.5}
-            roughness={0.28}
-            clearcoat={0.65}
-            envMapIntensity={1.5}
+            emissive={selected ? accent : '#000'}
+            emissiveIntensity={selected ? 0.15 : 0}
+            metalness={0.35}
+            roughness={0.4}
+            clearcoat={0.45}
+            envMapIntensity={1.35}
           />
         </mesh>
-        <mesh position={[0, 0.16, 0.01]} rotation={[0.2, 0, 0]} castShadow>
-          <cylinderGeometry args={[0.045, 0.058, 0.13, 18]} />
+        <mesh position={[0, 0.02, 0.04]} rotation={[0.2, 0, 0]}>
+          <torusGeometry args={[0.035, 0.01, 8, 16, Math.PI]} />
+          <meshStandardMaterial color="#0d1014" metalness={0.85} roughness={0.25} />
+        </mesh>
+        <mesh position={[0, 0.12, 0.02]} castShadow>
+          <boxGeometry args={[0.11, 0.14, 0.13]} />
           <meshPhysicalMaterial
-            color={nose}
-            metalness={0.95}
-            roughness={0.1}
-            clearcoat={0.85}
-            envMapIntensity={1.9}
+            ref={shellMatRef}
+            color={shell}
+            metalness={0.75}
+            roughness={0.18}
+            clearcoat={0.9}
+            envMapIntensity={1.75}
           />
         </mesh>
-        <mesh position={[0, 0.25, 0.03]} rotation={[0.2, 0, 0]}>
-          <cylinderGeometry args={[0.028, 0.038, 0.055, 14]} />
-          <meshStandardMaterial color="#0e1116" metalness={0.9} roughness={0.25} />
+        <mesh position={[0, 0.22, 0.04]} rotation={[0.25, 0, 0]} castShadow>
+          <cylinderGeometry args={[0.055, 0.062, 0.1, 20]} />
+          <meshPhysicalMaterial
+            ref={headMatRef}
+            color={silver}
+            metalness={0.95}
+            roughness={0.08}
+            clearcoat={1}
+            envMapIntensity={2}
+          />
+        </mesh>
+        <mesh position={[0, 0.28, 0.055]} rotation={[0.25, 0, 0]}>
+          <cylinderGeometry args={[0.038, 0.042, 0.03, 16]} />
+          <meshStandardMaterial color="#0a0c10" metalness={0.7} roughness={0.35} />
+        </mesh>
+        {[-0.015, 0.015].map((px) => (
+          <mesh key={px} position={[px, 0.3, 0.06]} rotation={[0.25, 0, 0]}>
+            <cylinderGeometry args={[0.006, 0.006, 0.02, 8]} />
+            <meshStandardMaterial color="#d4af37" metalness={1} roughness={0.15} />
+          </mesh>
+        ))}
+        <mesh position={[0, 0.16, 0.1]} castShadow>
+          <boxGeometry args={[0.04, 0.03, 0.035]} />
+          <meshStandardMaterial color="#e8edf2" metalness={0.8} roughness={0.2} />
         </mesh>
       </group>
 
-      {/* Cable guide on front of wing */}
-      <mesh position={[0, 0.52, frontZ + 0.03]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[0.04, 0.04, 0.045, 14]} />
-        <meshStandardMaterial color="#11151a" metalness={0.85} roughness={0.3} />
-      </mesh>
-      <mesh position={[0, -0.12, frontZ + 0.04]} castShadow>
-        <boxGeometry args={[0.055, 0.65, 0.04]} />
-        <meshStandardMaterial color={deep} metalness={0.75} roughness={0.3} />
-      </mesh>
-      <mesh position={[0, 0.32, frontZ + 0.07]} castShadow>
-        <cylinderGeometry args={[0.026, 0.026, 0.32, 10]} />
-        <meshStandardMaterial color={plugged ? '#8b1e2a' : '#1e242c'} metalness={0.25} roughness={0.65} />
-      </mesh>
-      <mesh position={[0, -0.05, frontZ + 0.08]} castShadow>
-        <cylinderGeometry args={[0.028, 0.026, 0.4, 10]} />
-        <meshStandardMaterial color={plugged ? '#9a2432' : '#252b34'} metalness={0.25} roughness={0.65} />
-      </mesh>
-      <mesh position={[0, -0.35, frontZ + 0.06]} rotation={[0.85, 0, 0]} castShadow>
-        <cylinderGeometry args={[0.026, 0.03, 0.24, 10]} />
-        <meshStandardMaterial color={plugged ? '#8b1e2a' : '#1e242c'} metalness={0.25} roughness={0.65} />
-      </mesh>
-      <mesh position={[0, -0.52, frontZ + 0.02]} castShadow>
-        <boxGeometry args={[0.14, 0.07, 0.12]} />
-        <meshStandardMaterial color={deep} metalness={0.8} roughness={0.28} />
+      {/* One continuous cable from gland into the gun boot */}
+      <mesh ref={cableMeshRef} geometry={cableGeo} castShadow>
+        <meshStandardMaterial
+          ref={cableMatRef}
+          color="#1e242c"
+          metalness={0.2}
+          roughness={0.72}
+        />
       </mesh>
 
+      {/* Dock cable clip (holds slack when gun is seated) */}
+      <mesh position={[0, -0.35, frontZ + 0.06]} castShadow>
+        <boxGeometry args={[0.14, 0.06, 0.08]} />
+        <meshStandardMaterial color={deep} metalness={0.82} roughness={0.28} />
+      </mesh>
+
+      <mesh position={[0, -0.62, frontZ + 0.03]} castShadow>
+        <boxGeometry args={[0.28, 0.14, 0.02]} />
+        <meshPhysicalMaterial color="#ffffff" metalness={0.1} roughness={0.25} clearcoat={0.6} />
+      </mesh>
       <CanvasLabel
         text={label}
-        position={[0, -0.68, frontZ + 0.05]}
-        width={0.24}
+        position={[0, -0.58, frontZ + 0.05]}
+        width={0.26}
         height={0.05}
-        fontSize={40}
-        color="#1a1f28"
+        fontSize={42}
+        color="#12161c"
       />
       <CanvasLabel
         text={`${powerKw} kW`}
-        position={[0, -0.78, frontZ + 0.05]}
+        position={[0, -0.68, frontZ + 0.05]}
         width={0.26}
         height={0.04}
-        fontSize={28}
+        fontSize={30}
         color={accent}
+      />
+      <CanvasLabel
+        text={charging ? 'CHARGING' : plugged ? 'IN USE' : 'READY'}
+        position={[0, -0.78, frontZ + 0.05]}
+        width={0.28}
+        height={0.035}
+        fontSize={24}
+        color={charging ? '#1a7a40' : plugged ? accent : '#5a6570'}
       />
     </group>
   );
@@ -736,9 +894,9 @@ export default function MassiveChargerMesh({
         ))
       )}
 
-      {/* Recessed screen bezel */}
-      <mesh position={[0, 2.35, bodyD / 2 + 0.01]} castShadow>
-        <boxGeometry args={[0.88, 0.68, 0.06]} />
+      {/* Recessed screen bezel — larger HMI */}
+      <mesh position={[0, 2.42, bodyD / 2 + 0.01]} castShadow>
+        <boxGeometry args={[1.02, 0.88, 0.06]} />
         <meshPhysicalMaterial
           color="#0c0f14"
           metalness={1}
@@ -747,8 +905,8 @@ export default function MassiveChargerMesh({
           envMapIntensity={2}
         />
       </mesh>
-      <mesh position={[0, 2.35, bodyD / 2 + 0.035]}>
-        <boxGeometry args={[0.82, 0.62, 0.02]} />
+      <mesh position={[0, 2.42, bodyD / 2 + 0.035]}>
+        <boxGeometry args={[0.96, 0.82, 0.02]} />
         <meshPhysicalMaterial
           color="#1a1014"
           metalness={0.25}
@@ -768,104 +926,23 @@ export default function MassiveChargerMesh({
         identity={identity}
         firmwareStatus={firmwareStatus}
         tariff={tariff}
-        position={[0, 2.35, bodyD / 2 + 0.055]}
-        size={[0.78, 0.585]}
+        position={[0, 2.42, bodyD / 2 + 0.055]}
+        size={[0.92, 0.78]}
         page={page}
         busy={busy}
         onPageChange={setPage}
         onStart={onStart}
         onStop={onStop}
         onPlug={onOutletPlug}
-        onTapCard={onTapCard}
         onClearFault={onClearFault}
         onSelectOutlet={onSelectOutlet}
       />
 
-      {/* Physical page keys — SESSION / OUTLETS always reachable */}
-      <group position={[0, 1.95, bodyD / 2 + 0.04]}>
-        <SoftKey
-          position={[-0.36, 0, 0]}
-          w={0.2}
-          h={0.1}
-          label="HOME"
-          color={page === 'home' ? '#f7d4d8' : '#eef2f6'}
-          accent={page === 'home'}
-          onClick={() => setPage('home')}
-        />
-        <SoftKey
-          position={[-0.12, 0, 0]}
-          w={0.2}
-          h={0.1}
-          label="SESSION"
-          color={page === 'session' ? '#f7d4d8' : '#eef2f6'}
-          accent={page === 'session'}
-          onClick={() => setPage('session')}
-        />
-        <SoftKey
-          position={[0.12, 0, 0]}
-          w={0.2}
-          h={0.1}
-          label="OUTLETS"
-          color={page === 'connectors' ? '#f7d4d8' : '#eef2f6'}
-          accent={page === 'connectors'}
-          onClick={() => setPage('connectors')}
-        />
-        <SoftKey
-          position={[0.36, 0, 0]}
-          w={0.2}
-          h={0.1}
-          label="INFO"
-          color={page === 'info' ? '#f7d4d8' : '#eef2f6'}
-          accent={page === 'info'}
-          onClick={() => setPage('info')}
-        />
-      </group>
-
-      {/* Soft keys under screen */}
-      <group position={[0, 1.72, bodyD / 2 + 0.04]}>
-        <SoftKey
-          position={[-0.36, 0, 0]}
-          w={0.22}
-          h={0.12}
-          label={active?.cablePlugged ? 'UNPLUG' : 'PLUG'}
-          color="#eef2f6"
-          disabled={busy}
-          onClick={() => onOutletPlug?.(active?.number, !active?.cablePlugged)}
-        />
-        <SoftKey
-          position={[-0.12, 0, 0]}
-          w={0.22}
-          h={0.12}
-          label="START"
-          color="#f7d4d8"
-          accent
-          disabled={busy || isTx}
-          onClick={() => onStart?.(active?.number)}
-        />
-        <SoftKey
-          position={[0.12, 0, 0]}
-          w={0.22}
-          h={0.12}
-          label="STOP"
-          color="#e8eef2"
-          disabled={busy || !isTx}
-          onClick={() => onStop?.(active?.number)}
-        />
-        <SoftKey
-          position={[0.36, 0, 0]}
-          w={0.22}
-          h={0.12}
-          label="CLEAR"
-          color="#ffe8a8"
-          disabled={busy || active?.status !== 'Faulted'}
-          onClick={() => onClearFault?.(active?.number)}
-        />
-      </group>
-
+      {/* RFID pad only — page/action buttons live on the touch screen (no duplicates) */}
       <RfidPad
-        position={[0, 1.42, bodyD / 2 + 0.04]}
-        w={0.78}
-        h={0.2}
+        position={[0, 1.78, bodyD / 2 + 0.04]}
+        w={0.92}
+        h={0.22}
         disabled={busy}
         onClick={() => onTapCard?.(active?.number)}
       />

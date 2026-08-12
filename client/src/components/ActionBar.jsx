@@ -118,6 +118,8 @@ export default function ActionBar({
         onChange={setIdTag}
         presets={charger.localAuthTags || []}
         onAddTag={onAddTag}
+        busy={busy}
+        onTap={(tag) => onStart(tag)}
       />
 
       <section className="ctrl-section">

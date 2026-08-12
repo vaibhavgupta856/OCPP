@@ -184,6 +184,8 @@ export class ChargePoint {
           sessionCost,
           lastSessionCost: c.lastSessionCost ?? null,
           lastSessionKwh: c.lastSessionKwh ?? null,
+          lastTransactionId: c.lastTransactionId ?? null,
+          lastIdTag: c.lastIdTag ?? null,
           smartLimitW: c.smartLimitW ?? null,
           smartLimitA: c.smartLimitA ?? null,
         };
@@ -1317,6 +1319,8 @@ export class ChargePoint {
 
     connector.transactionId = conf.transactionId ?? nextTransactionId++;
     connector.idTag = tag;
+    connector.lastTransactionId = connector.transactionId;
+    connector.lastIdTag = tag;
     connector.locked = true;
     connector.transactionStartMs = Date.now();
     connector.smartChargingSuspended = false;
@@ -1376,6 +1380,8 @@ export class ChargePoint {
     this.smartCharging.clearTxProfilesForTransaction(txId);
     this.smartCharging.clearTxProfilesForConnector(connectorId);
 
+    connector.lastTransactionId = txId;
+    connector.lastIdTag = idTag || null;
     connector.transactionId = null;
     connector.idTag = null;
     connector.transactionStartMs = null;
@@ -1416,7 +1422,8 @@ export class ChargePoint {
 
   setTariff({ energyRatePerKwh, currency, currencySymbol } = {}) {
     if (energyRatePerKwh != null && Number.isFinite(Number(energyRatePerKwh))) {
-      this.energyRatePerKwh = Math.max(0, Number(energyRatePerKwh));
+      const n = Number(energyRatePerKwh);
+      this.energyRatePerKwh = Math.min(1e5, Math.max(0, n));
     }
     if (currency) this.currency = String(currency).slice(0, 8).toUpperCase();
     if (currencySymbol) this.currencySymbol = String(currencySymbol).slice(0, 4);

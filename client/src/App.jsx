@@ -26,7 +26,7 @@ export default function App() {
   const [idTag, setIdTag] = useState('CARD-7F2A91');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [benchOpen, setBenchOpen] = useState(false);
+  const [benchOpen, setBenchOpen] = useState(true);
 
   const selected = useMemo(
     () => chargers.find((c) => c.cpId === selectedId) || null,
@@ -117,9 +117,11 @@ export default function App() {
     setBusy(true);
     setError('');
     try {
-      await fn();
+      const result = await fn();
+      return { ok: true, result };
     } catch (err) {
       setError(err.message);
+      return { ok: false, error: err.message };
     } finally {
       setBusy(false);
     }

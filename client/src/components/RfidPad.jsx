@@ -1,15 +1,47 @@
 import { useState } from 'react';
 
-export default function RfidPad({ value, onChange, presets = [], onAddTag }) {
+export default function RfidPad({ value, onChange, presets = [], onAddTag, onTap, busy = false }) {
   const [custom, setCustom] = useState('');
+  const [outcome, setOutcome] = useState(null); // 'ok' | 'fail' | 'pending'
+
+  const handleTap = async () => {
+    if (busy || !onTap || outcome === 'pending') return;
+    setOutcome('pending');
+    try {
+      const result = await onTap(value);
+      const accepted = result == null || result === true || result?.ok === true;
+      setOutcome(accepted ? 'ok' : 'fail');
+    } catch {
+      setOutcome('fail');
+    }
+    window.setTimeout(() => setOutcome(null), 1800);
+  };
+
+  const faceClass = [
+    'rfid-face',
+    outcome === 'pending' ? 'pending' : '',
+    outcome === 'ok' ? 'accepted' : '',
+    outcome === 'fail' ? 'rejected' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  const label =
+    outcome === 'pending' ? '…' : outcome === 'ok' ? 'OK' : outcome === 'fail' ? 'NO' : 'TAP';
 
   return (
     <section className="rfid-pad">
       <h3>Card reader</h3>
-      <div className="rfid-face">
+      <button
+        type="button"
+        className={faceClass}
+        disabled={busy || !onTap || outcome === 'pending'}
+        onClick={handleTap}
+        title="Tap RFID card to authorize and start"
+      >
         <div className="rfid-ring" />
-        <div className="rfid-core">TAP</div>
-      </div>
+        <div className="rfid-core">{label}</div>
+      </button>
       <label>
         idTag
         <input value={value} onChange={(e) => onChange(e.target.value)} />
