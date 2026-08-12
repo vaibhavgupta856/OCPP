@@ -12,6 +12,27 @@ import './styles/console.css';
 /* Injected at build time by Vite (see vite.config.js) */
 const APP_BUILD = typeof __APP_BUILD__ !== 'undefined' ? __APP_BUILD__ : 'dev';
 
+/** If an old cached bundle is open after a deploy, hard-reload once. */
+async function syncToLatestDeploy() {
+  if (!APP_BUILD || APP_BUILD === 'dev' || APP_BUILD.startsWith('local-')) return;
+  try {
+    const res = await fetch(`/api/health?_=${Date.now()}`, { cache: 'no-store' });
+    const data = await res.json();
+    const remote = data?.commit;
+    if (!remote || remote === APP_BUILD) return;
+    const key = `reload-for-${remote}`;
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, '1');
+    const url = new URL(window.location.href);
+    url.searchParams.set('v', remote);
+    window.location.replace(url.toString());
+  } catch {
+    /* ignore — offline / cold start */
+  }
+}
+
+syncToLatestDeploy();
+
 const api = async (path, options = {}) => {
   const res = await fetch(path, {
     headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
